@@ -134,6 +134,7 @@ $(foreach lib,$(libraries),$(eval $(call library_template,$(subst .,_,$(lib)),$(
 clean:
 	@echo "$(ERRORC)Cleaning...$(RESETC)"
 	rm -f *.[aodP] *~ $(programs)
+	$(foreach prog,$(programs), rm -f $(addsuffix *.[aodP],$(sort $(dir $($(prog)_SRCS)))))
 	@if [ "x$(subdirs)" != "x" ]; then \
 	 for d in $(subdirs); do \
 	  (cd $$d && $(MAKE) clean); \
