@@ -60,12 +60,12 @@ $(1)_%_cpp.o: %.cpp
 	@if [ "x$$(DEBUG)" = "xtrue" ]; then echo "$$(COMPILING)$$(CXX)$$(RESETC) $$(COMPILERC)$$(CXXFLAGS) $$($(1)_CXXFLAGS) -MMD -c $$(COMPILING)$$<$$(RESETC)$$(COMPILERC) -o $$@$$(RESETC)"; \
 	 else echo "$$(COMPILING)Compiling $$<$$(RESETC)"; fi
 	@if $$(CXX) $$(CXXFLAGS) $$($(1)_CXXFLAGS) -MMD -c $$< -o $$@; then \
-	 cp $(1)_$$*_cpp.d $(1)_$$*_cpp.P; \
-	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$$$//' -e '/^$$$$/ d' -e 's/$$$$/ :/' < $(1)_$$*_cpp.d >> $(1)_$$*_cpp.P; \
-	 rm -f $(1)_$$*_cpp.d; \
+	 cp $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.d) $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.P); \
+	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$$$//' -e '/^$$$$/ d' -e 's/$$$$/ :/' < $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.d) >> $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.P); \
+	 rm -f $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.d); \
 	else \
 	 echo "$$(ERRORC)Compilation failed for $$@: $$(RESETC)"; \
-	 rm -f $(1)_$$*_cpp.d; \
+	 rm -f $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.d); \
 	 exit 1; \
 	fi
 
@@ -73,12 +73,12 @@ $(1)_%_c.o: %.c
 	@if [ "x$$(DEBUG)" = "xtrue" ]; then echo "$$(COMPILING)$$(CC)$$(RESETC) $$(COMPILERC)$$(CFLAGS) $$($(1)_CFLAGS) -MMD -c $$(COMPILING)$$<$$(RESETC)$$(COMPILERC) -o $$@$$(RESETC)"; \
 	 else echo "$$(COMPILING)Compiling $$<$$(RESETC)"; fi
 	@if $$(CC) $$(CFLAGS) $$($(1)_CFLAGS) -MMD -c $$< -o $$@; then \
-	 cp $(1)_$$*_c.d $(1)_$$*_c.P; \
-	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$$$//' -e '/^$$$$/ d' -e 's/$$$$/ :/' < $(1)_$$*_c.d >> $(1)_$$*_c.P; \
-	 rm -f $(1)_$$*_c.d; \
+	 cp $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.d) $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.P); \
+	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$$$//' -e '/^$$$$/ d' -e 's/$$$$/ :/' < $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.d) >> $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.P); \
+	 rm -f $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.d); \
 	else \
 	 echo "$$(ERRORC)Compilation failed for $$@: $$(RESETC)"; \
-	 rm -f $(1)_$$*_c.d; \
+	 rm -f $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.d); \
 	 exit 1; \
 	fi
 
@@ -100,29 +100,30 @@ $(1)_%_cpp.o: %.cpp
 	@if [ "x$$(DEBUG)" = "xtrue" ]; then echo "$$(COMPILING)$$(CXX)$$(RESETC) $$(COMPILERC)$$(CXXFLAGS) $$($(1)_CXXFLAGS) -MMD -c $$(COMPILING)$$<$$(RESETC)$$(COMPILERC) -o $$@$$(RESETC)"; \
 	 else echo "$$(COMPILING)Compiling $$<$$(RESETC)"; fi
 	@if $$(CXX) $$(CXXFLAGS) $$($(1)_CXXFLAGS) -MMD -c $$< -o $$@; then \
-	 cp $(1)_$$*_cpp.d $(1)_$$*_cpp.P; \
-	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$$$//' -e '/^$$$$/ d' -e 's/$$$$/ :/' < $(1)_$$*_cpp.d >> $(1)_$$*_cpp.P; \
-	 rm -f $(1)_$$*_cpp.d; \
+	 cp $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.d) $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.P); \
+	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$$$//' -e '/^$$$$/ d' -e 's/$$$$/ :/' < $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.d) >> $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.P); \
+	 rm -f $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.d); \
 	else \
 	 echo "$$(ERRORC)Compilation failed for $$@: $$(RESETC)"; \
-	 rm -f $(1)_$$*_cpp.d; \
+	 rm -f $$(dir $$*_cpp.d)$(1)_$$(notdir $$*_cpp.d); \
 	 exit 1; \
 	fi
+
 
 $(1)_%_c.o: %.c
 	@if [ "x$$(DEBUG)" = "xtrue" ]; then echo "$$(COMPILING)$$(CC)$$(RESETC) $$(COMPILERC)$$(CFLAGS) $$($(1)_CFLAGS) -MMD -c $$(COMPILING)$$<$$(RESETC)$$(COMPILERC) -o $$@$$(RESETC)"; \
 	 else echo "$$(COMPILING)Compiling $$<$$(RESETC)"; fi
 	@if $$(CC) $$(CFLAGS) $$($(1)_CFLAGS) -MMD -c $$< -o $$@; then \
-	 cp $(1)_$$*_c.d $(1)_$$*_c.P; \
-	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$$$//' -e '/^$$$$/ d' -e 's/$$$$/ :/' < $(1)_$$*_c.d >> $(1)_$$*_c.P; \
-	 rm -f $(1)_$$*_c.d; \
+	 cp $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.d) $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.P); \
+	 sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$$$//' -e '/^$$$$/ d' -e 's/$$$$/ :/' < $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.d) >> $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.P); \
+	 rm -f $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.d); \
 	else \
 	 echo "$$(ERRORC)Compilation failed for $$@: $$(RESETC)"; \
-	 rm -f $(1)_$$*_c.d; \
+	 rm -f $$(dir $$*_c.d)$(1)_$$(notdir $$*_c.d); \
 	 exit 1; \
 	fi
 
--include $$(addprefix $(1)_, $$($(1)_SRCS:.cpp=.P))
+-include $$($(1)_OBJS:.o=.P)
 endef
 
 $(foreach subdir,$(subdirs),$(eval $(call subdir_template,$(subdir))))
