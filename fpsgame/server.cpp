@@ -14,6 +14,7 @@ namespace game
 }
 
 extern ENetAddress masteraddress;
+extern char *serverip;
 
 namespace server
 {
@@ -478,10 +479,95 @@ namespace server
         return false;
     }
 
+	VAR(httpport, 0, 0, 65535);
+	evhttp *http;
+
+	static void httpgencb(struct evhttp_request *req, void *arg) {
+		evhttp_send_error(req, 404, "Not Found");
+	}
+
+	static void httpstatuscb(struct evhttp_request *req, void *arg) {
+		evbuffer *buf = evbuffer_new();
+		evbuffer_add_printf(buf, "{ totalmillis: %d }", totalmillis);
+		evhttp_send_reply(req, 200, "OK", buf);
+		evbuffer_free(buf);
+	}
+
+	static void httpplayerscb(struct evhttp_request *req, void *arg) {
+		evbuffer *buf = evbuffer_new();
+		evbuffer_add_printf(buf, "[\n");
+		loopv(clients) {
+			clientinfo *ci = clients[i];
+			if(!ci) continue;
+			if(i > 0) evbuffer_add_printf(buf, ", ");
+			evbuffer_add_printf(buf, "\t{ name: \"%s\", team: \"%s\", clientnum: \"%d\", privilege: \"%d\", connectmillis: \"%d\", playermodel: \"%d\", authname: \"%s\", ping: \"%d\" }\n",
+				ci->name, ci->team, ci->clientnum, ci->privilege, totalmillis - ci->connectmillis, ci->playermodel, ci->authname, ci->ping); //FIXME: JSON escaping
+		}
+		evbuffer_add_printf(buf, "]\n");
+		evhttp_send_reply(req, 200, "OK", buf);
+		evbuffer_free(buf);
+	}
+
+	static void httpadmincb(struct evhttp_request *req, void *arg) {
+		struct evkeyvalq *k = evhttp_request_get_input_headers(req);
+		const char *auth = evhttp_find_header(k, "Authorization");
+		bool good = false;
+		if(adminpass[0] && auth) {
+			string auth_type, auth_string;
+			sscanf(auth, "%20s %150s", auth_type, auth_string);
+			defformatstring(pass)("admin:%s", adminpass);
+			if(base64_strcmp(pass, auth_string)) {
+				good = true;
+			} else good = false;
+		}
+		if(good) {
+//			struct evkeyvalq query;
+//			evhttp_parse_query(evhttp_request_get_uri(req), &query);
+			// kick
+//			const char *kickme = evhttp_find_header(query, "kick");
+			
+			evbuffer *buf = evbuffer_new();
+			evbuffer_add_printf(buf, "<h1>Admin</h1>");
+//			if(kickme) evbuffer_add_printf(buf, "Kicking %d\n", atoi(kickme));
+			evhttp_send_reply(req, 200, "OK", buf);
+			evbuffer_free(buf);
+		} else {
+			struct evkeyvalq *o = evhttp_request_get_output_headers(req);
+			evhttp_add_header(o, "WWW-Authenticate", "Basic realm=\"Secure Area\"");
+			evbuffer *buf = evbuffer_new();
+			evbuffer_add_printf(buf, "<h1>Authorization required</h1>");
+			evhttp_send_reply(req, 401, "Authorization Required", buf);
+			evbuffer_free(buf);
+		}
+	}
+
+	static void httpindexcb(struct evhttp_request *req, void *arg) {
+		evbuffer *buf = evbuffer_new();
+		evbuffer_add_printf(buf, "<a href=\"/status\">Server status</a> | <a href=\"/players\">Players</a>");
+		evhttp_send_reply(req, 200, "OK", buf);
+		evbuffer_free(buf);
+	}
+
+	void httpinit() {
+		http = evhttp_new(evbase);
+		if(!httpport) return;
+		if(evhttp_bind_socket(http, serverip[0]?serverip:NULL, httpport) < 0) {
+			conoutf("Could not create http server on %s:%d\n", serverip, httpport);
+			evhttp_free(http);
+			return;
+		}
+		evhttp_set_cb(http, "/", httpindexcb, NULL);
+		evhttp_set_cb(http, "/status", httpstatuscb, NULL);
+		evhttp_set_cb(http, "/players", httpplayerscb, NULL);
+		evhttp_set_cb(http, "/admin", httpadmincb, NULL);
+		evhttp_set_gencb(http, httpgencb, NULL);
+	}
+
     void serverinit()
     {
         smapname[0] = '\0';
         resetitems();
+    	httpinit();
     }
 
     int numclients(int exclude = -1, bool nospec = true, bool noai = true, bool priv = false)

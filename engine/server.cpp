@@ -3,18 +3,14 @@
 
 #include "engine.h"
 
-#include <event2/event.h>
-#include <event2/event_struct.h>
-#include <event2/dns.h>
-
 event_base *evbase;
 evdns_base *dnsbase;
-event serverhost_input_event;
-event pongsock_input_event;
-event lansock_input_event;
-event update_event;
-event netstats_event;
-event stdin_event;
+static event serverhost_input_event;
+static event pongsock_input_event;
+static event lansock_input_event;
+static event update_event;
+static event netstats_event;
+static event stdin_event;
 
 
 #ifdef STANDALONE
@@ -709,7 +705,7 @@ static void serverinfo_input(int fd, short e, void *arg) {
 	server::serverinforeply(req, p);
 }
 
-void netstats_event_handler(int, short, void *) {
+static void netstats_event_handler(int, short, void *) {
 	if(nonlocalclients || serverhost->totalSentData || serverhost->totalReceivedData) printf("status: %d remote clients, %.1f send, %.1f rec (K/sec)\n", nonlocalclients, serverhost->totalSentData/60.0f/1024, serverhost->totalReceivedData/60.0f/1024);
 	serverhost->totalSentData = serverhost->totalReceivedData = 0;
 	timeval one_min;
@@ -718,7 +714,7 @@ void netstats_event_handler(int, short, void *) {
 	event_add(&netstats_event, &one_min);
 }
 
-void update_server(int fd, short e, void *arg) {
+static void update_server(int fd, short e, void *arg) {
 	timeval to;
 	to.tv_sec = 0;
 	to.tv_usec = 5000;
