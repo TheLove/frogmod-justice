@@ -2,6 +2,8 @@ frogserv
 config.h
 config.mk
 
+server-init.cfg
+
 engine/*.[Po]
 shared/*.[Po]
 fpsgame/*.[Po]
