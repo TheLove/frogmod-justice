@@ -49,3 +49,39 @@ uint randomMT(void)
     return(y ^ (y >> 18));
 }
 
+static const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+int base64_read_bit(char *s, int &bit) {
+	int ofs = (bit >> 3);
+	char *c = s + ofs;
+	char *p;
+	while(*c && !(p = strchr((char *)b64, *c))) { c++; bit += 8; }
+	if(!*c) return -1;
+	int v = p - b64;
+	int mask = 0x20 >> (bit&0x07);
+	int val = v & mask;
+	bit++;
+	if((bit & 0x07) >= 6) bit += 8 - (bit & 0x07);
+	return val != 0;
+}
+
+int base64_read_byte(char *s, int &bit) {
+	int val = 0;
+	for(int i = 0; i < 8; i++) {
+		int c = base64_read_bit(s, bit);
+		if(c < 0) return -1;
+		if(c) val |= (0x80 >> i);
+	}
+	return val;
+}
+
+bool base64_strcmp(const char *s, const char *s64) {
+	const char *c = s; int b = 0;
+	int bit = 0;
+	while((b = base64_read_byte((char *)s64, bit)) >= 0) {
+		if(*c != b) return false;
+		c++;
+	}
+	if(!*c && b>=0) return false;
+	if(b < 0 && *c) return false;
+	return true;
+}

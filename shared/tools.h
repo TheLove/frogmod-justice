@@ -956,5 +956,6 @@ extern int listzipfiles(const char *dir, const char *ext, vector<char *> &files)
 extern void seedMT(uint seed);
 extern uint randomMT(void);
 
-#endif
+extern bool base64_strcmp(const char *s, const char *s64); // compare a string with its base64 equivalent
 
+#endif
