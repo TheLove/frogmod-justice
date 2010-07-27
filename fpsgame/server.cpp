@@ -516,9 +516,7 @@ namespace server
 			string auth_type, auth_string;
 			sscanf(auth, "%20s %150s", auth_type, auth_string);
 			defformatstring(pass)("admin:%s", adminpass);
-			if(base64_strcmp(pass, auth_string)) {
-				good = true;
-			} else good = false;
+			good = base64_strcmp(pass, auth_string);
 		}
 		if(good) {
 //			struct evkeyvalq query;
@@ -527,7 +525,10 @@ namespace server
 //			const char *kickme = evhttp_find_header(query, "kick");
 			
 			evbuffer *buf = evbuffer_new();
-			evbuffer_add_printf(buf, "<h1>Admin</h1>");
+			int len = 0;
+			char *html = loadfile("admin.html", &len);
+			if(html && len > 0) evbuffer_add(buf, html, len);
+			else evbuffer_add_printf(buf, "admin.html not found");
 //			if(kickme) evbuffer_add_printf(buf, "Kicking %d\n", atoi(kickme));
 			evhttp_send_reply(req, 200, "OK", buf);
 			evbuffer_free(buf);
@@ -543,7 +544,10 @@ namespace server
 
 	static void httpindexcb(struct evhttp_request *req, void *arg) {
 		evbuffer *buf = evbuffer_new();
-		evbuffer_add_printf(buf, "<a href=\"/status\">Server status</a> | <a href=\"/players\">Players</a>");
+		int len = 0;
+		char *html = loadfile("server-index.html", &len);
+		if(html && len > 0) evbuffer_add(buf, html, len);
+		else evbuffer_add_printf(buf, "server-index.html not found<br><a href=\"/status\">Server status</a> | <a href=\"/players\">Players</a>");
 		evhttp_send_reply(req, 200, "OK", buf);
 		evbuffer_free(buf);
 	}
