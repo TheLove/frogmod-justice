@@ -287,7 +287,8 @@ namespace server
             lastevent = 0;
             exceeded = 0;
             pushed = 0;
-            clientmap[0] = '\0';
+            authname[0] = 0;
+            clientmap[0] = 0;
             mapcrc = 0;
             warned = false;
             gameclip = false;
