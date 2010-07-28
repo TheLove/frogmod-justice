@@ -480,6 +480,10 @@ namespace server
         return false;
     }
 
+	/*****************************
+	 *  HTTP
+	 *****************************/
+
 	VAR(httpport, 0, 0, 65535);
 	evhttp *http;
 
@@ -489,7 +493,7 @@ namespace server
 
 	static void httpstatuscb(struct evhttp_request *req, void *arg) {
 		evbuffer *buf = evbuffer_new();
-		evbuffer_add_printf(buf, "{ \"totalmillis\": %d, \"mastermode\": %d, \"mastermodename\": \"%s\", \"mastermask\": %d, \"gamemode\": %d, \"gamemodename\": \"%s\", \"map\": \"%s\" }", totalmillis, mastermode, mastermodename(mastermode), mastermask, gamemode, gamemodes[gamemode].name, smapname);
+		evbuffer_add_printf(buf, "{ \"totalmillis\": %d, \"mastermode\": %d, \"mastermodename\": \"%s\", \"mastermask\": %d, \"gamemode\": %d, \"gamemodename\": \"%s\", \"map\": \"%s\" }", totalmillis, mastermode, mastermodename(mastermode), mastermask, gamemode, modename(gamemode), smapname);
 		evhttp_send_reply(req, 200, "OK", buf);
 		evbuffer_free(buf);
 	}
