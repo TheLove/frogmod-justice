@@ -6,9 +6,82 @@
 <style type="text/css">
 </style>
 <script type="text/javascript">
+var players_update_millis = 2000;
+
+function ajaxCall(uri, cb) {
+	var xhr;
+	if(window.XMLHttpRequest) { // code for IE7+, Firefox, Chrome, Opera, Safari
+		xhr=new XMLHttpRequest();
+	} else { // code for IE6, IE5
+		xhr=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	xhr.onreadystatechange = cb;
+	xhr.open('GET', uri, true);
+	xhr.send();
+}
+
+function update_players() {
+	ajaxCall('/players', function() {
+		if(this.readyState == 4 && this.status == 200) {
+			var div = document.getElementById('players');
+			if(div) {
+				var players = eval(this.responseText);
+				if(players && players.length > 0) {
+					var html = new Array();
+					html.push('<table><tr><th>Cn</th><th>Name</th><th>Ping</th></tr>');
+					for(p in players) {
+						html.push('<tr><td>'+players[p].clientnum+'</td><td>'+players[p].name+'</td><td>'+players[p].ping+'</td></tr>');
+					}
+					html.push('</table>');
+					div.innerHTML = html.join('');
+				} else div.innerHTML = 'No players on the server.';
+			}
+			setTimeout(update_players, players_update_millis);
+		}
+	});
+}
+
+function update_status() {
+	ajaxCall('/status', function() {
+		if(this.readyState == 4 && this.status == 200) {
+			var div = document.getElementById('status');
+			if(div) {
+				console.log(this.responseText);
+				var status = eval(this.responseText);
+				console.log(status);
+				if(status) {
+					var html = new Array();
+					html.push('<ul>');
+					var seconds = status.totalmillis / 1000;
+					var minutes = status.totalmillis / 60000;
+					var hours = status.totalmillis / 360000;
+					html.push('<li>Uptime: '+hours+':'+minutes+':'+seconds+'</li>');
+					html.push('<li>Mastermode: '+status.mastermodename+' ('+status.mastermode+')</li>');
+					html.push('<li>Game mode: '+status.gamemodename+' ('+status.gamemode+')</li>');
+					html.push('<li>Map: <b>'+status.map+'</b></li>');
+					html.push('</ul>');
+					div.innerHTML = html.join('');
+				} else div.innerHTML = 'No players on the server.';
+			}
+			setTimeout(update_players, players_update_millis);
+		}
+	});
+}
+
+function init() {
+	update_players();
+	update_status();
+}
+
 </script>
 </head>
-<body>
+<body onload="init()">
 <h1>Frogmod console</h1>
+<div id="status">
+Loading...
+</div>
+<div id="players">
+Loading...
+</div>
 </body>
 </html>
