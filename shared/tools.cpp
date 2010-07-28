@@ -49,6 +49,8 @@ uint randomMT(void)
     return(y ^ (y >> 18));
 }
 
+// below is added by vampi
+
 static const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 int base64_read_bit(char *s, int &bit) {
 	int ofs = (bit >> 3);
@@ -85,3 +87,62 @@ bool base64_strcmp(const char *s, const char *s64) {
 	if(b < 0 && *c) return false;
 	return true;
 }
+
+void bufferevent_print_error(short what, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	vprintf(fmt, ap);
+	va_end(ap);
+
+#define checkerr(s) { if(what & BEV_EVENT_##s) printf(" %s", #s); }
+	checkerr(CONNECTED);
+	checkerr(READING);
+	checkerr(WRITING);
+	checkerr(EOF);
+	checkerr(ERROR);
+	checkerr(TIMEOUT);
+	printf(" errno=%d \"%s\"\n", errno, strerror(errno));
+}
+
+void evdns_print_error(int result, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	vprintf(fmt, ap);
+	va_end(ap);
+
+#define DNSERR(x) if(result == DNS_ERR_##x) printf(" DNS_ERR_" #x);
+	DNSERR(NONE); DNSERR(FORMAT); DNSERR(SERVERFAILED);
+	DNSERR(NOTEXIST); DNSERR(NOTIMPL); DNSERR(REFUSED);
+	DNSERR(TRUNCATED); DNSERR(UNKNOWN); DNSERR(TIMEOUT);
+	DNSERR(SHUTDOWN); DNSERR(CANCEL);
+	printf(" errno=%d \"%s\"\n", errno, strerror(errno));
+}
+
+void bufferevent_write_vprintf(struct bufferevent *be, const char *fmt, va_list ap) {
+	struct evbuffer *eb = evbuffer_new();
+	if(!eb) return;
+	evbuffer_add_vprintf(eb, fmt, ap);
+	bufferevent_write_buffer(be, eb);
+	evbuffer_free(eb);
+}
+
+void bufferevent_write_printf(struct bufferevent *be, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	bufferevent_write_vprintf(be, fmt, ap);
+	va_end(ap);
+}
+
+char *evbuffer_readln_nul(struct evbuffer *buffer, size_t *n_read_out, enum evbuffer_eol_style eol_style) {
+	size_t len;
+	char *result = evbuffer_readln(buffer, n_read_out, eol_style);
+	if(result) return result;
+	len = evbuffer_get_length(buffer);
+	if(len == 0) return NULL;
+	if(!(result = (char *)malloc(len+1))) return NULL;
+	evbuffer_remove(buffer, result, len);
+	result[len] = '\0';
+	if(n_read_out) *n_read_out = len;
+	return result;
+}
+

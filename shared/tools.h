@@ -958,4 +958,15 @@ extern uint randomMT(void);
 
 extern bool base64_strcmp(const char *s, const char *s64); // compare a string with its base64 equivalent
 
+// below is added by vampi
+
+// Debug a function call (print it out and execute it)
+// #define DEBUGF(a) { printf("%s: %d: %s\n", __FILE__, __LINE__, #a); a; }
+#define DEBUGF(a) { a; }
+void bufferevent_print_error(short what, const char *fmt, ...);
+void evdns_print_error(int result, const char *fmt, ...);
+void bufferevent_write_printf(struct bufferevent *be, const char *fmt, ...);
+void bufferevent_write_vprintf(struct bufferevent *be, const char *fmt, va_list ap);
+char *evbuffer_readln_nul(struct evbuffer *buffer, size_t *n_read_out, enum evbuffer_eol_style eol_style);
+
 #endif

@@ -21,6 +21,7 @@
 #include <stdarg.h>
 #include <limits.h>
 #include <assert.h>
+#include <errno.h>
 #ifdef __GNUC__
 #include <new>
 #else
@@ -75,6 +76,8 @@
 #include "geom.h"
 #include "ents.h"
 #include "command.h"
+
+#include "evirc.h"
 
 #include "iengine.h"
 #include "igame.h"

@@ -571,11 +571,24 @@ namespace server
 		evhttp_set_gencb(http, httpgencb, NULL);
 	}
 
+	void ircmsgcb(IRC::Source *source, char *msg) {
+		fromirc = true;
+		string buf;
+		color_irc2sauer(msg, buf);
+		conoutf("\f4%s \f2<%s> \f7%s", source->channel->alias, source->peer->nick, msg);
+		fromirc = false;
+	}
+
+	void ircinit() {
+		irc.channel_message_cb = ircmsgcb;
+	}
+
     void serverinit()
     {
         smapname[0] = '\0';
         resetitems();
     	httpinit();
+    	ircinit();
     }
 
     int numclients(int exclude = -1, bool nospec = true, bool noai = true, bool priv = false)
@@ -820,7 +833,7 @@ namespace server
         while(trim>timestr && isspace(*--trim)) *trim = '\0';
         formatstring(d.info)("%s: %s, %s, %.2f%s", timestr, modename(gamemode), smapname, len > 1024*1024 ? len/(1024*1024.f) : len/1024.0f, len > 1024*1024 ? "MB" : "kB");
         defformatstring(msg)("demo \"%s\" recorded", d.info);
-        sendservmsg(msg);
+        conoutf(3, msg);
         d.data = new uchar[len];
         d.len = len;
         demotmp->seek(0, SEEK_SET);
@@ -841,7 +854,7 @@ namespace server
         stream *f = opengzfile(NULL, "wb", demotmp);
         if(!f) { DELETEP(demotmp); return; }
 
-        sendservmsg("recording demo");
+        conoutf(3, "recording demo");
 
         demorecord = f;
 
@@ -872,14 +885,14 @@ namespace server
         {
             loopv(demos) delete[] demos[i].data;
             demos.shrink(0);
-            sendservmsg("cleared all demos");
+            conoutf(3, "cleared all demos");
         }
         else if(demos.inrange(n-1))
         {
             delete[] demos[n-1].data;
             demos.remove(n-1);
             defformatstring(msg)("cleared demo %d", n);
-            sendservmsg(msg);
+            conoutf(3, msg);
         }
     }
 
@@ -898,7 +911,7 @@ namespace server
 
         loopv(clients) sendf(clients[i]->clientnum, 1, "ri3", N_DEMOPLAYBACK, 0, clients[i]->clientnum);
 
-        sendservmsg("demo playback finished");
+        conoutf(3, "demo playback finished");
 
         loopv(clients) sendwelcome(clients[i]);
     }
@@ -923,12 +936,12 @@ namespace server
         if(msg[0])
         {
             DELETEP(demoplayback);
-            sendservmsg(msg);
+            conoutf(3, "%s", msg);
             return;
         }
 
         formatstring(msg)("playing demo \"%s\"", file);
-        sendservmsg(msg);
+        conoutf(3, "%s", msg);
 
         demomillis = 0;
         sendf(-1, 1, "ri3", N_DEMOPLAYBACK, 1, -1);
@@ -1053,7 +1066,7 @@ namespace server
         string msg;
         if(val && authname) formatstring(msg)("%s claimed %s as '\fs\f5%s\fr'", colorname(ci), name, authname);
         else formatstring(msg)("%s %s %s", colorname(ci), val ? "claimed" : "relinquished", name);
-        sendservmsg(msg);
+        conoutf(2, msg);
         currentmaster = val ? ci->clientnum : -1;
         sendf(-1, 1, "ri4", N_CURRENTMASTER, currentmaster, currentmaster >= 0 ? ci->privilege : 0, mastermode);
         if(gamepaused)
@@ -1540,7 +1553,7 @@ namespace server
             if(demorecord) enddemorecord();
             if(best && (best->count > (force ? 1 : maxvotes/2)))
             {
-                sendservmsg(force ? "vote passed by default" : "vote passed by majority");
+                conoutf(2, force ? "vote passed by default" : "vote passed by majority");
                 sendf(-1, 1, "risii", N_MAPCHANGE, best->map, best->mode, 1);
                 changemap(best->map, best->mode);
             }
@@ -1558,7 +1571,7 @@ namespace server
         if(hasnonlocalclients() && !mapreload)
         {
             defformatstring(msg)("local player forced %s on map %s", modename(mode), map);
-            sendservmsg(msg);
+            conoutf(2, msg);
         }
         sendf(-1, 1, "risii", N_MAPCHANGE, map, mode, 1);
         changemap(map, mode);
@@ -1577,7 +1590,7 @@ namespace server
             if((!ci->local || hasnonlocalclients()) && !mapreload)
             {
                 defformatstring(msg)("%s forced %s on map %s", ci->privilege && mastermode>=MM_VETO ? privname(ci->privilege) : "local player", modename(ci->modevote), ci->mapvote);
-                sendservmsg(msg);
+                conoutf(2, msg);
             }
             sendf(-1, 1, "risii", N_MAPCHANGE, ci->mapvote, ci->modevote, 1);
             changemap(ci->mapvote, ci->modevote);
@@ -1585,7 +1598,7 @@ namespace server
         else
         {
             defformatstring(msg)("%s suggests %s on map %s (select map to vote)", colorname(ci), modename(reqmode), map);
-            sendservmsg(msg);
+            conoutf(3, msg);
             checkvotes();
         }
     }
@@ -2133,7 +2146,7 @@ namespace server
         if(!mapdata) { sendf(sender, 1, "ris", N_SERVMSG, "failed to open temporary file for map"); return; }
         mapdata->write(data, len);
         defformatstring(msg)("[%s uploaded map to server, \"/getmap\" to receive it]", colorname(ci));
-        sendservmsg(msg);
+        conoutf(2, msg);
     }
 
     void sendclipboard(clientinfo *ci)
@@ -2160,6 +2173,13 @@ namespace server
             disconnect_client(victim, DISC_KICK);
         }
     }
+
+	bool processtext(clientinfo *ci, char *text) {
+		fromgame = true;
+		conoutf(1, "\f1<%s> \f0%s", ci->name, text);
+		fromgame = false;
+		return true;
+	}
 
     void parsepacket(int sender, int chan, packetbuf &p)     // has to parse exactly each byte of the packet
     {
@@ -2471,11 +2491,13 @@ namespace server
 
             case N_TEXT:
             {
-                QUEUE_AI;
-                QUEUE_MSG;
                 getstring(text, p);
                 filtertext(text, text);
-                QUEUE_STR(text);
+                if(processtext(ci, text)) {
+	                QUEUE_AI;
+	                QUEUE_MSG;
+	                QUEUE_STR(text);
+	            }
                 break;
             }
 
@@ -2613,6 +2635,7 @@ namespace server
                 {
                     if((ci->privilege>=PRIV_ADMIN || ci->local) || (mastermask&(1<<mm)))
                     {
+                    	conoutf(2, "\f4Mastermode is now \f5%s\f4 (%d)", mastermodename(mastermode), mastermode);
                         mastermode = mm;
                         allowedips.shrink(0);
                         if(mm>=MM_PRIVATE)
@@ -2637,7 +2660,7 @@ namespace server
                 if(ci->privilege || ci->local)
                 {
                     bannedips.shrink(0);
-                    sendservmsg("cleared all bans");
+                    conoutf(2, "All bans cleared.");
                 }
                 break;
             }
@@ -2706,7 +2729,7 @@ namespace server
                 if(ci->privilege<PRIV_ADMIN && !ci->local) break;
                 demonextmatch = val!=0;
                 defformatstring(msg)("demo recording is %s for next match", demonextmatch ? "enabled" : "disabled");
-                sendservmsg(msg);
+                conoutf(2, msg);
                 break;
             }
 
@@ -2758,6 +2781,7 @@ namespace server
                     resetitems();
                     notgotitems = false;
                     if(smode) smode->reset(true);
+                    conoutf("%s started a new map of size %d", ci->name, size);
                 }
                 QUEUE_MSG;
                 break;
@@ -2833,7 +2857,7 @@ namespace server
             case N_PASTE:
                 if(ci->state.state!=CS_SPECTATOR) sendclipboard(ci);
                 goto genericmsg;
-    
+
             case N_CLIPBOARD:
             {
                 int unpacklen = getint(p), packlen = getint(p); 

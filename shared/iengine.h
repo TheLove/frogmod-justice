@@ -460,3 +460,9 @@ extern void g3d_cursorpos(float &x, float &y);
 extern void g3d_resetcursor();
 extern void g3d_limitscale(float scale);
 
+extern IRC::Client irc;
+extern bool fromirc;
+extern bool fromgame;
+void color_irc2sauer(char *src, char *dst);
+void color_sauer2irc(char *src, char *dst);
+void color_sauer2console(char *src, char *dst);

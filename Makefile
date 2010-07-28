@@ -6,7 +6,7 @@ programs=frogserv
 eventdir=libevent2
 enetdir=enet
 
-frogserv_SRCS=shared/crypto.cpp shared/stream.cpp shared/tools.cpp engine/command.cpp engine/server.cpp fpsgame/server.cpp
+frogserv_SRCS=shared/crypto.cpp shared/stream.cpp shared/tools.cpp shared/evirc.cpp engine/command.cpp engine/server.cpp fpsgame/server.cpp
 frogserv_EXTRA_DEPS=$(enetdir)/.libs/libenet.a $(eventdir)/.libs/libevent.a
 frogserv_CXXFLAGS=-Wall -fomit-frame-pointer -fsigned-char -Ienet/include -I$(eventdir)/include -I$(eventdir) -DFROGMOD_VERSION=\"$(FROGMOD_VERSION)\" -DSTANDALONE -Ishared -Iengine
 frogserv_LDFLAGS=$(enetdir)/.libs/libenet.a $(eventdir)/.libs/libevent.a
