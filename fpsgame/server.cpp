@@ -489,7 +489,7 @@ namespace server
 
 	static void httpstatuscb(struct evhttp_request *req, void *arg) {
 		evbuffer *buf = evbuffer_new();
-		evbuffer_add_printf(buf, "{ totalmillis: %d, mastermode: %d, mastermodename: \"%s\", mastermask: %d, gamemode: %d, gamemodename: \"%s\", map: \"%s\" }", totalmillis, mastermode, mastermodename(mastermode), mastermask, gamemode, gamemodes[gamemode].name, smapname);
+		evbuffer_add_printf(buf, "{ \"totalmillis\": %d, \"mastermode\": %d, \"mastermodename\": \"%s\", \"mastermask\": %d, \"gamemode\": %d, \"gamemodename\": \"%s\", \"map\": \"%s\" }", totalmillis, mastermode, mastermodename(mastermode), mastermask, gamemode, gamemodes[gamemode].name, smapname);
 		evhttp_send_reply(req, 200, "OK", buf);
 		evbuffer_free(buf);
 	}
@@ -501,7 +501,7 @@ namespace server
 			clientinfo *ci = clients[i];
 			if(!ci) continue;
 			if(i > 0) evbuffer_add_printf(buf, ", ");
-			evbuffer_add_printf(buf, "\t{ name: \"%s\", team: \"%s\", clientnum: \"%d\", privilege: \"%d\", connectmillis: \"%d\", playermodel: \"%d\", authname: \"%s\", ping: \"%d\" }\n",
+			evbuffer_add_printf(buf, "\t{ \"name\": \"%s\", \"team\": \"%s\", \"clientnum\": \"%d\", \"privilege\": \"%d\", \"connectmillis\": \"%d\", \"playermodel\": \"%d\", \"authname\": \"%s\", \"ping\": \"%d\" }\n",
 				ci->name, ci->team, ci->clientnum, ci->privilege, totalmillis - ci->connectmillis, ci->playermodel, ci->authname, ci->ping); //FIXME: JSON escaping
 		}
 		evbuffer_add_printf(buf, "]\n");
@@ -520,11 +520,14 @@ namespace server
 			good = base64_strcmp(pass, auth_string);
 		}
 		if(good) {
-//			struct evkeyvalq query;
-//			evhttp_parse_query(evhttp_request_get_uri(req), &query);
+			struct evkeyvalq query;
+			evhttp_parse_query(evhttp_request_get_uri(req), &query);
 			// kick
-//			const char *kickme = evhttp_find_header(query, "kick");
-			
+			const char *kickme = evhttp_find_header(&query, "kick");
+			if(kickme) {
+				int cn = atoi(kickme);
+				kick_client(cn);
+			}
 			evbuffer *buf = evbuffer_new();
 			int len = 0;
 			char *html = loadfile("admin.html", &len);
@@ -2022,7 +2025,7 @@ namespace server
             if(checkgban(getclientip(ci->clientnum))) disconnect_client(ci->clientnum, DISC_IPBAN);
         }
     }
-        
+
     int allowconnect(clientinfo *ci, const char *pwd)
     {
         if(ci->local) return DISC_NONE;
@@ -2145,6 +2148,16 @@ namespace server
                 if(!flushed) { flushserver(true); flushed = true; }
                 sendpacket(e.clientnum, 1, ci->clipboard);
             }
+        }
+    }
+
+    void kick_client(int victim) {
+        if(getclientinfo(victim)) { // no bots
+            ban &b = bannedips.add();
+            b.time = totalmillis;
+            b.ip = getclientip(victim);
+            allowedips.removeobj(b.ip);
+            disconnect_client(victim, DISC_KICK);
         }
     }
 
@@ -2632,14 +2645,7 @@ namespace server
             case N_KICK:
             {
                 int victim = getint(p);
-                if((ci->privilege || ci->local) && ci->clientnum!=victim && getclientinfo(victim)) // no bots
-                {
-                    ban &b = bannedips.add();
-                    b.time = totalmillis;
-                    b.ip = getclientip(victim);
-                    allowedips.removeobj(b.ip);
-                    disconnect_client(victim, DISC_KICK);
-                }
+                if((ci->privilege || ci->local) && ci->clientnum!=victim) kick_client(victim);
                 break;
             }
 

@@ -4,11 +4,124 @@
 <head>
 <title>Frogmod admin</title>
 <style type="text/css">
+body {
+	font-family: Arial, sans-serif;
+	font-size: 11px;
+}
+h1 {
+	color: green;
+}
+h2 {
+	color: darkgreen;
+	border-bottom: 1px solid #ccc;
+	font-size: 14px;
+}
+table {
+	border: 1px solid #ddd;
+	border-collapse: collapse;
+}
+td {
+	border: 1px solid #ddd;
+	border-collapse: collapse;
+	text-align: left;
+	vertical-align: top;
+	padding: 1px 4px;
+}
+th {
+	background: #ddd;
+	border-collapse: collapse;
+	text-align: left;
+	font-weight: bold;
+}
+.privilege0 {
+}
+.privilege1 {
+	color: green;
+}
+.privilege2 {
+	color: darkorange;
+}
+#links { float: right; }
 </style>
 <script type="text/javascript">
+var players_update_millis = 2000;
+var status_update_millis = 2000;
+
+function ajaxCall(uri, cb) {
+	var xhr;
+	if(window.XMLHttpRequest) { // code for IE7+, Firefox, Chrome, Opera, Safari
+		xhr=new XMLHttpRequest();
+	} else { // code for IE6, IE5
+		xhr=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	xhr.onreadystatechange = cb;
+	xhr.open('GET', uri, true);
+	xhr.send();
+}
+
+function update_players() {
+	ajaxCall('/players', function() {
+		if(this.readyState == 4 && this.status == 200) {
+			var div = document.getElementById('players');
+			if(div) {
+				var players = eval('(' + this.responseText + ')');
+				if(players && players.length > 0) {
+					var html = new Array();
+					html.push('<table><tr><th>Cn</th><th>Name</th><th>Team</th><th>Ping</th><th></th></tr>');
+					for(p in players) {
+						html.push('<tr class="privilege'+players[p].privilege+'"><td>'+players[p].clientnum+'</td><td>'+players[p].name+'</td><td>'+players[p].team+'</td><td>'+players[p].ping+'</td><td><a href="?kick='+players[p].clientnum+'" title="Kick">[K]</a></tr>');
+					}
+					html.push('</table>');
+					div.innerHTML = html.join('');
+				} else div.innerHTML = 'No players on the server.';
+			}
+			setTimeout(update_players, players_update_millis);
+		}
+	});
+}
+
+function update_status() {
+	ajaxCall('/status', function() {
+		if(this.readyState == 4 && this.status == 200) {
+			var div = document.getElementById('status');
+			if(div) {
+				var st = eval('('+this.responseText+')');
+				if(st) {
+					var html = new Array();
+					html.push('<ul>');
+					var seconds = Math.floor(st.totalmillis / 1000);
+					var minutes = Math.floor(st.totalmillis / 60000);
+					var hours = Math.floor(st.totalmillis / 360000);
+					html.push('<li>Uptime: '+hours+':'+minutes+':'+seconds+'</li>');
+					html.push('<li>Mastermode: '+st.mastermodename+' ('+st.mastermode+')</li>');
+					html.push('<li>Game mode: '+st.gamemodename+' ('+st.gamemode+')</li>');
+					html.push('<li>Map: '+(st.map?'<b>'+st.map+'</b>':'<i>No map</i>')+'</li>');
+					html.push('</ul>');
+					div.innerHTML = html.join('');
+				} else div.innerHTML = 'No players on the server.';
+			}
+			setTimeout(update_status, status_update_millis);
+		}
+	});
+}
+
+function init() {
+	update_players();
+	update_status();
+}
+
 </script>
 </head>
-<body>
+<body onload="init()">
+<div id="links">admin | <a href="/">index</a></div>
 <h1>Frogmod admin</h1>
+<h2>Status:</h2>
+<div id="status">
+Loading...
+</div>
+<h2>Players:</h2>
+<div id="players">
+Loading...
+</div>
 </body>
 </html>
