@@ -1,0 +1,38 @@
+body {
+	font-family: Arial, sans-serif;
+	font-size: 11px;
+}
+h1 {
+	color: green;
+}
+h2 {
+	color: darkgreen;
+	border-bottom: 1px solid #ccc;
+	font-size: 14px;
+}
+table {
+	border: 1px solid #ddd;
+	border-collapse: collapse;
+}
+td {
+	border: 1px solid #ddd;
+	border-collapse: collapse;
+	text-align: left;
+	vertical-align: top;
+	padding: 1px 4px;
+}
+th {
+	background: #ddd;
+	border-collapse: collapse;
+	text-align: left;
+	font-weight: bold;
+}
+.privilege0 {
+}
+.privilege1 {
+	color: green;
+}
+.privilege2 {
+	color: darkorange;
+}
+#links { float: right; }

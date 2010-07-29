@@ -488,12 +488,26 @@ namespace server
 	evhttp *http;
 
 	static void httpgencb(struct evhttp_request *req, void *arg) {
-		evhttp_send_error(req, 404, "Not Found");
+		char *f = (char *)evhttp_request_get_uri(req);
+		char *q = strchr(f, '?'); if(q) *q = 0; // remove ?foo=bar params
+		char *s = strrchr(f, '/'); // basename
+		if(s) f = s+1;
+		int len;
+		char *contents = NULL;
+		defformatstring(path)("web/%s", f);
+		if(f) contents = loadfile(path, &len);
+		if(contents) {
+			evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text");
+			evbuffer *buf = evbuffer_new();
+			evbuffer_add(buf, contents, len);
+			evhttp_send_reply(req, 200, "OK", buf);
+			evbuffer_free(buf);
+		} else evhttp_send_error(req, 404, "Not Found");
 	}
 
 	static void httpstatuscb(struct evhttp_request *req, void *arg) {
 		evbuffer *buf = evbuffer_new();
-		evbuffer_add_printf(buf, "{ \"totalmillis\": %d, \"mastermode\": %d, \"mastermodename\": \"%s\", \"mastermask\": %d, \"gamemode\": %d, \"gamemodename\": \"%s\", \"map\": \"%s\" }", totalmillis, mastermode, mastermodename(mastermode), mastermask, gamemode, modename(gamemode), smapname);
+		evbuffer_add_printf(buf, "{ \"totalmillis\": %d, \"mastermode\": %d, \"mastermodename\": \"%s\", \"mastermask\": %d, \"gamemode\": %d, \"gamemodename\": \"%s\", \"map\": \"%s\", \"maxclients\": %d }", totalmillis, mastermode, mastermodename(mastermode), mastermask, gamemode, modename(gamemode), smapname, maxclients);
 		evhttp_send_reply(req, 200, "OK", buf);
 		evbuffer_free(buf);
 	}
@@ -534,7 +548,7 @@ namespace server
 			}
 			evbuffer *buf = evbuffer_new();
 			int len = 0;
-			char *html = loadfile("admin.html", &len);
+			char *html = loadfile("web/admin.html", &len);
 			if(html && len > 0) evbuffer_add(buf, html, len);
 			else evbuffer_add_printf(buf, "admin.html not found");
 //			if(kickme) evbuffer_add_printf(buf, "Kicking %d\n", atoi(kickme));
@@ -553,7 +567,7 @@ namespace server
 	static void httpindexcb(struct evhttp_request *req, void *arg) {
 		evbuffer *buf = evbuffer_new();
 		int len = 0;
-		char *html = loadfile("server-index.html", &len);
+		char *html = loadfile("web/index.html", &len);
 		if(html && len > 0) evbuffer_add(buf, html, len);
 		else evbuffer_add_printf(buf, "server-index.html not found<br><a href=\"/status\">Server status</a> | <a href=\"/players\">Players</a>");
 		evhttp_send_reply(req, 200, "OK", buf);

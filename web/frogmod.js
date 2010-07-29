@@ -1,49 +1,3 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
-"http://www.w3.org/TR/html4/loose.dtd">
-<html>
-<head>
-<title>Frogmod admin</title>
-<style type="text/css">
-body {
-	font-family: Arial, sans-serif;
-	font-size: 11px;
-}
-h1 {
-	color: green;
-}
-h2 {
-	color: darkgreen;
-	border-bottom: 1px solid #ccc;
-	font-size: 14px;
-}
-table {
-	border: 1px solid #ddd;
-	border-collapse: collapse;
-}
-td {
-	border: 1px solid #ddd;
-	border-collapse: collapse;
-	text-align: left;
-	vertical-align: top;
-	padding: 1px 4px;
-}
-th {
-	background: #ddd;
-	border-collapse: collapse;
-	text-align: left;
-	font-weight: bold;
-}
-.privilege0 {
-}
-.privilege1 {
-	color: green;
-}
-.privilege2 {
-	color: darkorange;
-}
-#links { float: right; }
-</style>
-<script type="text/javascript">
 var players_update_millis = 2000;
 var status_update_millis = 2000;
 
@@ -59,6 +13,17 @@ function ajaxCall(uri, cb) {
 	xhr.send();
 }
 
+function format_time(t) {
+	var seconds = Math.floor(t / 1000) % 60;
+	if(seconds < 10) seconds = '0'+seconds; // zero pad x_x
+	var minutes = Math.floor(t / 60000) % 60;
+	if(minutes < 10) minutes = '0'+minutes;
+	var hours = Math.floor(t / 360000) % 24;
+	if(hours < 10) hours = '0' + hours;
+	var days = Math.floor(t / 86400000);
+	return (days > 0 ? days + 'd ': '') + hours + ':' + minutes + ':' + seconds;
+}
+
 function update_players() {
 	ajaxCall('/players', function() {
 		if(this.readyState == 4 && this.status == 200) {
@@ -67,9 +32,9 @@ function update_players() {
 				var players = eval('(' + this.responseText + ')');
 				if(players && players.length > 0) {
 					var html = new Array();
-					html.push('<table><tr><th>Cn</th><th>Name</th><th>Team</th><th>Ping</th><th></th></tr>');
+					html.push('<table><tr><th>Cn</th><th>Name</th><th>Team</th><th>Ping</th><th>Uptime</th></tr>');
 					for(p in players) {
-						html.push('<tr class="privilege'+players[p].privilege+'"><td>'+players[p].clientnum+'</td><td>'+players[p].name+'</td><td>'+players[p].team+'</td><td>'+players[p].ping+'</td><td><a href="?kick='+players[p].clientnum+'" title="Kick">[K]</a></tr>');
+						html.push('<tr class="privilege'+players[p].privilege+'"><td>'+players[p].clientnum+'</td><td>'+players[p].name+'</td><td>'+players[p].team+'</td><td>'+players[p].ping+'</td><td>'+format_time(players[p].connectmillis)+'</td></tr>');
 					}
 					html.push('</table>');
 					div.innerHTML = html.join('');
@@ -89,13 +54,11 @@ function update_status() {
 				if(st) {
 					var html = new Array();
 					html.push('<ul>');
-					var seconds = Math.floor(st.totalmillis / 1000);
-					var minutes = Math.floor(st.totalmillis / 60000);
-					var hours = Math.floor(st.totalmillis / 360000);
-					html.push('<li>Uptime: '+hours+':'+minutes+':'+seconds+'</li>');
+					html.push('<li>Uptime: '+format_time(st.totalmillis)+'</li>');
 					html.push('<li>Mastermode: '+st.mastermodename+' ('+st.mastermode+')</li>');
 					html.push('<li>Game mode: '+st.gamemodename+' ('+st.gamemode+')</li>');
 					html.push('<li>Map: '+(st.map?'<b>'+st.map+'</b>':'<i>No map</i>')+'</li>');
+					html.push('<li>Max players: '+st.maxclients+'</li>');
 					html.push('</ul>');
 					div.innerHTML = html.join('');
 				} else div.innerHTML = 'No players on the server.';
@@ -110,18 +73,3 @@ function init() {
 	update_status();
 }
 
-</script>
-</head>
-<body onload="init()">
-<div id="links">admin | <a href="/">index</a></div>
-<h1>Frogmod admin</h1>
-<h2>Status:</h2>
-<div id="status">
-Loading...
-</div>
-<h2>Players:</h2>
-<div id="players">
-Loading...
-</div>
-</body>
-</html>
