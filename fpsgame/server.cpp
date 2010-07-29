@@ -2495,13 +2495,12 @@ namespace server
 
             case N_TEXT:
             {
+                QUEUE_AI;
+                QUEUE_MSG;
                 getstring(text, p);
                 filtertext(text, text);
-                if(processtext(ci, text)) {
-	                QUEUE_AI;
-	                QUEUE_MSG;
-	                QUEUE_STR(text);
-	            }
+                processtext(ci, text);
+                QUEUE_STR(text);
                 break;
             }
 
