@@ -487,6 +487,20 @@ namespace server
 	VAR(httpport, 0, 0, 65535);
 	evhttp *http;
 
+	static const char *find_mime_type(char *filename) {
+		const char *ext = strrchr(filename, '.');
+		if(ext) {
+			if(!strcasecmp(ext, ".css")) return "text/css";
+			if(!strcasecmp(ext, ".js")) return "text/javascript";
+			if(!strcasecmp(ext, ".html")) return "text/html";
+			if(!strcasecmp(ext, ".jpg")) return "image/jpeg";
+			if(!strcasecmp(ext, ".jpeg")) return "image/jpeg";
+			if(!strcasecmp(ext, ".png")) return "image/png";
+			if(!strcasecmp(ext, ".gif")) return "image/gif";
+		}
+		return "text";
+	}
+
 	static void httpgencb(struct evhttp_request *req, void *arg) {
 		char *f = (char *)evhttp_request_get_uri(req);
 		char *q = strchr(f, '?'); if(q) *q = 0; // remove ?foo=bar params
@@ -497,7 +511,7 @@ namespace server
 		defformatstring(path)("web/%s", f);
 		if(f) contents = loadfile(path, &len);
 		if(contents) {
-			evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text");
+			evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", find_mime_type(f));
 			evbuffer *buf = evbuffer_new();
 			evbuffer_add(buf, contents, len);
 			evhttp_send_reply(req, 200, "OK", buf);
