@@ -122,11 +122,22 @@ enum
     CON_ERROR = 1<<2,
     CON_DEBUG = 1<<3,
     CON_INIT  = 1<<4,
-    CON_ECHO  = 1<<5
+    CON_ECHO  = 1<<5,
 };
 
 extern void conoutf(const char *s, ...);
 extern void conoutf(int type, const char *s, ...);
+
+#define OUT_DEFAULT_VERBOSITY 3
+enum
+{
+    OUT_NOCONSOLE   = 1 << 8,
+    OUT_NOGAME      = 1 << 9,
+    OUT_NOIRC       = 1 << 10
+};
+
+extern void outf(const char *s, ...);
+extern void outf(int verbosity, const char *s, ...);
 
 // menus
 extern vec menuinfrontofplayer();
@@ -461,8 +472,6 @@ extern void g3d_resetcursor();
 extern void g3d_limitscale(float scale);
 
 extern IRC::Client irc;
-extern bool fromirc;
-extern bool fromgame;
 void color_irc2sauer(char *src, char *dst);
 void color_sauer2irc(char *src, char *dst);
 void color_sauer2console(char *src, char *dst);

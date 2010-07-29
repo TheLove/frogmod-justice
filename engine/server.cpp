@@ -118,19 +118,40 @@ void fatal(const char *s, ...)
     exit(EXIT_FAILURE); 
 }
 
-bool fromirc, fromgame;
-void conoutfv(int type, const char *fmt, va_list args)
+void voutf(int v, const char *fmt, va_list args)
 {
     string sf, sp;
     vformatstring(sf, fmt, args);
 
 	color_sauer2console(sf, sp);
-    puts(sp);
-    if(irc.base && !fromirc) {
+	if(!(v & OUT_NOCONSOLE)) puts(sp);
+    if(irc.base && !(v & OUT_NOIRC)) {
     	color_sauer2irc(sf, sp);
-    	irc.speak(type, "%s", sp);
+    	irc.speak(v, "%s", sp);
     }
-    if(!fromgame) server::sendservmsg(sf);
+    if(!(v & OUT_NOGAME)) server::sendservmsg(sf);
+}
+
+void outf(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    voutf(OUT_DEFAULT_VERBOSITY, fmt, args);
+    va_end(args);
+}
+
+void outf(int v, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    voutf(v, fmt, args);
+    va_end(args);
+}
+
+
+void conoutfv(int type, const char *fmt, va_list args)
+{
+	voutf(3 | OUT_NOIRC | OUT_NOGAME, fmt, args);
 }
 
 void conoutf(const char *fmt, ...)
@@ -570,9 +591,9 @@ void processmasterinput()
         while(args < end && isspace(*args)) args++;
 
         if(!strncmp(input, "failreg", cmdlen))
-            conoutf(CON_ERROR, "master server registration failed: %s", args);
+            outf(2 | OUT_NOGAME, "master server registration failed: %s", args);
         else if(!strncmp(input, "succreg", cmdlen))
-            conoutf("master server registration succeeded");
+            outf(2 | OUT_NOGAME, "master server registration succeeded");
         else server::processmasterinput(input, cmdlen, args);
 
         masterinpos = end - masterin.getbuf();
