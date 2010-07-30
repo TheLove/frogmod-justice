@@ -127,7 +127,7 @@ void voutf(int v, const char *fmt, va_list args)
 	if(!(v & OUT_NOCONSOLE)) puts(sp);
     if(irc.base && !(v & OUT_NOIRC)) {
     	color_sauer2irc(sf, sp);
-    	irc.speak(v, "%s", sp);
+    	irc.speak(v & 0xff, "%s", sp);
     }
     if(!(v & OUT_NOGAME)) server::sendservmsg(sf);
 }
