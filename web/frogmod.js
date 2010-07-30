@@ -18,7 +18,7 @@ function format_time(t) {
 	if(seconds < 10) seconds = '0'+seconds; // zero pad x_x
 	var minutes = Math.floor(t / 60000) % 60;
 	if(minutes < 10) minutes = '0'+minutes;
-	var hours = Math.floor(t / 360000) % 24;
+	var hours = Math.floor(t / 3600000) % 24;
 	if(hours < 10) hours = '0' + hours;
 	var days = Math.floor(t / 86400000);
 	return (days > 0 ? days + 'd ': '') + hours + ':' + minutes + ':' + seconds;
