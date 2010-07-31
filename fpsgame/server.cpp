@@ -591,6 +591,8 @@ namespace server
 		evbuffer_add_json_prop(buf, "mastermask", mastermask);
 		evbuffer_add_json_prop(buf, "gamemode", gamemode);
 		evbuffer_add_json_prop(buf, "gamemodename", modename(gamemode));
+		evbuffer_add_json_prop(buf, "gamemillis", gamemillis);
+		evbuffer_add_json_prop(buf, "gamelimit", gamelimit);
 		evbuffer_add_json_prop(buf, "map", smapname, false);
 		evbuffer_add_printf(buf, "}");
 		evhttp_send_reply(req, 200, "OK", buf);

@@ -19,7 +19,7 @@ function ajaxCall(uri, cb) {
 	xhr.send();
 }
 
-function format_time(t) {
+function format_time(t, show_hours) {
 	var seconds = Math.floor(t / 1000) % 60;
 	if(seconds < 10) seconds = '0'+seconds; // zero pad x_x
 	var minutes = Math.floor(t / 60000) % 60;
@@ -27,7 +27,7 @@ function format_time(t) {
 	var hours = Math.floor(t / 3600000) % 24;
 	if(hours < 10) hours = '0' + hours;
 	var days = Math.floor(t / 86400000);
-	return (days > 0 ? days + 'd ': '') + hours + ':' + minutes + ':' + seconds;
+	return (days > 0 ? days + 'd ': '') + (show_hours?hours+':':(parseInt(hours)>0?hours+':':'')) + minutes + ':' + seconds;
 }
 
 //! written by quaker66:
@@ -98,9 +98,10 @@ function update_status() {
 					if(st) {
 						var html = new Array();
 						html.push('<ul>');
-						html.push('<li>Uptime: '+format_time(st.totalmillis)+'</li>');
+						html.push('<li>Uptime: '+format_time(st.totalmillis, true)+'</li>');
 						html.push('<li>Mastermode: '+st.mastermodename+' ('+st.mastermode+')</li>');
 						html.push('<li>Game mode: '+st.gamemodename+' ('+st.gamemode+')</li>');
+						html.push('<li>Game time: '+format_time(st.gamemillis)+' / '+format_time(st.gamelimit)+'</li>');
 						html.push('<li>Map: '+(st.map?'<b>'+st.map+'</b>':'<i>No map</i>')+'</li>');
 						html.push('</ul>');
 						div.innerHTML = html.join('');
@@ -127,7 +128,7 @@ function update_players_cb(xhr) {
 					for(p in players) {
 						html.push('<tr'+(players[p].state == 5 ? ' class="spec"': (players[p].state == 1 ? ' class="dead"' :''))+'>');
 						html.push('<td>'+players[p].clientnum+'</td>');
-						html.push('<td class="privilege'+players[p].privilege+'"><img title="'+icons[players[p].playermodel].replace('.png', '')+'" src="'+icons[players[p].playermodel]+'"> '+players[p].name+'</td>');
+						html.push('<td class="privilege'+players[p].privilege+'"><img title="'+icons[players[p].playermodel].replace('.png', '')+'" src="'+icons[players[p].playermodel]+'">&nbsp;'+players[p].name+'</td>');
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
 						html.push('<td>'+players[p].ping+'</td>');

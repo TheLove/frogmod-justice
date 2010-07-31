@@ -29,6 +29,7 @@ td {
 	text-align: left;
 	vertical-align: middle;
 	padding: 1px 4px 1px 4px;
+	whitespace: nowrap;
 }
 td img {
 	vertical-align: middle;
