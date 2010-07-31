@@ -35,7 +35,9 @@ static void irc_eventcb(struct bufferevent *buf, short what, void *arg) {
 		DEBUGF(evbuffer_free(eb));
 		s->state = Server::SentIdent;
 	} else {
-		bufferevent_print_error(what, "Disconnected from %s:", s->host);
+		if(what == (BEV_EVENT_EOF | BEV_EVENT_READING))
+			printf("Disconnected from \"%s\".", s->host);
+		else bufferevent_print_error(what, "Disconnected from \"%s\":", s->host);
 
 		DEBUGF(bufferevent_free(s->buf));
 		s->buf = NULL;
@@ -48,38 +50,23 @@ static void irc_eventcb(struct bufferevent *buf, short what, void *arg) {
 			timeval tv;
 			tv.tv_sec = 10;
 			tv.tv_usec = 0;
+			printf("Reconnecting in %d seconds...\n", (int)tv.tv_sec);
 			DEBUGF(evtimer_add(s->reconnect_event, &tv));
 		}
 	}
 }
 
-static void irc_dnscb(int result, char type, int count, int ttl, void *addresses, void *arg) {
+static void irc_connectcb(int fd, short type, void *arg) {
 	Server *s = (Server *)arg;
-	if(result == DNS_ERR_NONE) {
-		if(type == DNS_IPv4_A) {
-			struct sockaddr_in addr;
-			addr.sin_addr.s_addr = ((in_addr_t *)addresses)[0];
-			addr.sin_port = htons(s->port);
-			addr.sin_family = AF_INET;
-			s->state = Server::Connecting;
-			if(s->buf) DEBUGF(bufferevent_free(s->buf));
-			DEBUGF(s->buf = bufferevent_socket_new(s->client->base, -1, BEV_OPT_CLOSE_ON_FREE));
-			DEBUGF(bufferevent_setcb(s->buf, irc_readcb, irc_writecb, irc_eventcb, s));
-			DEBUGF(bufferevent_socket_connect(s->buf, (sockaddr *)&addr, sizeof(struct sockaddr_in)));
-		}
-	}
-}
-
-static void irc_reconnectcb(int fd, short type, void *arg) {
-	printf("Reconnecting...\n");
-	Server *s = (Server *)arg;
-	DEBUGF(evdns_base_resolve_ipv4(s->client->dnsbase, s->host, 0, irc_dnscb, arg));
+	DEBUGF(s->buf = bufferevent_socket_new(s->client->base, -1, BEV_OPT_CLOSE_ON_FREE));
+	DEBUGF(bufferevent_setcb(s->buf, irc_readcb, irc_writecb, irc_eventcb, s));
+	bufferevent_socket_connect_hostname(s->buf, s->client->dnsbase, AF_UNSPEC, s->host, s->port);
 }
 
 void Server::init() {
 	DEBUGF(evbuf = evbuffer_new());
 	buf = NULL;
-	DEBUGF(reconnect_event = evtimer_new(client->base, irc_reconnectcb, this));
+	DEBUGF(reconnect_event = evtimer_new(client->base, irc_connectcb, this));
 }
 
 bool Server::connect(const char *h, const char *n, int p, const char *alias_) {
@@ -87,7 +74,7 @@ bool Server::connect(const char *h, const char *n, int p, const char *alias_) {
 	port = p;
 	if(alias_) alias = strdup(alias_); else alias = strdup(h);
 	nick = strdup(n);
-	DEBUGF(evdns_base_resolve_ipv4(client->dnsbase, host, 0, irc_dnscb, this));
+	irc_connectcb(0, 0, this);
 	return true;
 }
 
@@ -142,6 +129,7 @@ void Server::read() {
 	DEBUGF(bufferevent_read_buffer(buf, evbuf));
 	char *ln;
 	while((ln = evbuffer_readln(evbuf, NULL, EVBUFFER_EOL_ANY))) {
+		printf("Server parsing [%s]\n", ln);
 		parse(ln);
 		free(ln);
 	}
@@ -169,7 +157,7 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 			s.channel = NULL;
 			if(is_action) {
 				if(client->private_action_message_cb) client->private_action_message_cb(&s, trailing + 8);
-			} else if(client->channel_message_cb) client->private_message_cb(&s, trailing);
+			} else if(client->private_message_cb) client->private_message_cb(&s, trailing);
 		}
 	} else if(!strcmp(command, "NOTICE")) {
 		if(client->notice_cb) client->notice_cb(this, prefix, trailing);
@@ -269,7 +257,7 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 		for(int i = 0; i < nparams; i++) {
 			printf(" [%s]", params[i]);
 		}
-		printf(", [%d], [%s]);\n", nparams, trailing);*/
+		printf(", [%d], [%s]);\n", nparams, trailing); */
 	}
 }
 

@@ -128,9 +128,19 @@ struct Client {
 	event_base *base;
 	evdns_base *dnsbase;
 
-	Client() {}
-	Client(event_base *b, evdns_base *db) { base = b; dnsbase = db; }
+	Client() { init(); }
+	Client(event_base *b, evdns_base *db) { base = b; dnsbase = db; init(); }
 	~Client() {}
+
+	void init() {
+		channel_message_cb = private_message_cb = 0;
+		channel_action_message_cb = private_action_message_cb = 0;
+		notice_cb = motd_cb = unhandled_cb = ping_cb = 0;
+		join_cb = 0;
+		part_cb = 0;
+		server_quit_cb = 0;
+		empty_cb = 0;
+	}
 
 	typedef void (*GenericCallback)(Server *, char*, char *);
 	typedef void (*MessageCallback)(Source *, char *msg);
