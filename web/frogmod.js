@@ -48,7 +48,7 @@ function update_info() {
 						html.push('</ul>');
 						div.innerHTML = html.join('');
 					} else div.innerHTML = 'Could not parse response';
-				} else div.innerHTML = 'Error ' + this.status;
+				} else div.innerHTML = 'Error ' + (this.status ? this.status : '(unreachable)');
 				setTimeout(update_status, status_update_millis);
 			}
 		}
@@ -72,13 +72,12 @@ function update_status() {
 						html.push('</ul>');
 						div.innerHTML = html.join('');
 					} else div.innerHTML = 'No players on the server.';
-				} else div.innerHTML = 'Error ' + this.status
+				} else div.innerHTML = 'Error ' + (this.status ? this.status : '(unreachable)');
 				setTimeout(update_status, status_update_millis);
 			}
 		}
 	});
 }
-
 
 function update_players_cb(xhr) {
 	if(xhr.readyState == 4) {
@@ -119,7 +118,7 @@ function update_players_cb(xhr) {
 					html.push('</table>');
 					div.innerHTML = html.join('');
 				} else div.innerHTML = 'No players on the server.';
-			} else div.innerHTML = 'Error ' + xhr.status;
+			} else div.innerHTML = 'Error ' + (xhr.status ? xhr.status : '(unreachable)');
 			setTimeout(update_players, players_update_millis);
 		}
 	}
