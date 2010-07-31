@@ -60,7 +60,6 @@ static void irc_dnscb(int result, char type, int count, int ttl, void *addresses
 			struct sockaddr_in addr;
 			addr.sin_addr.s_addr = ((in_addr_t *)addresses)[0];
 			addr.sin_port = htons(s->port);
-			printf("connecting to %s:%d\n", s->host, s->port);
 			addr.sin_family = AF_INET;
 			s->state = Server::Connecting;
 			if(s->buf) DEBUGF(bufferevent_free(s->buf));
