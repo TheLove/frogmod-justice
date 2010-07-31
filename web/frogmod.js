@@ -5,6 +5,7 @@ var players_update_millis = 2000;
 var status_update_millis = 2000;
 var admin = false;
 var states = [ 'Alive', 'Dead', 'Spawning', 'Lagged', 'Editing', 'Spectator' ];
+var icons = [ 'fixit.png', 'ironsnout.png', 'ogro.png', 'inky.png', 'cannon.png' ];
 
 function ajaxCall(uri, cb) {
 	var xhr;
@@ -126,7 +127,7 @@ function update_players_cb(xhr) {
 					for(p in players) {
 						html.push('<tr'+(players[p].state == 5 ? ' class="spec"': (players[p].state == 1 ? ' class="dead"' :''))+'>');
 						html.push('<td>'+players[p].clientnum+'</td>');
-						html.push('<td class="privilege'+players[p].privilege+'">'+players[p].name+'</td>');
+						html.push('<td class="privilege'+players[p].privilege+'"><img title="'+icons[players[p].playermodel].replace('.png', '')+'" src="'+icons[players[p].playermodel]+'"> '+players[p].name+'</td>');
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
 						html.push('<td>'+players[p].ping+'</td>');
