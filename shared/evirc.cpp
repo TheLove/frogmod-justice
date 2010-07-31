@@ -129,7 +129,6 @@ void Server::read() {
 	DEBUGF(bufferevent_read_buffer(buf, evbuf));
 	char *ln;
 	while((ln = evbuffer_readln(evbuf, NULL, EVBUFFER_EOL_ANY))) {
-		printf("Server parsing [%s]\n", ln);
 		parse(ln);
 		free(ln);
 	}
