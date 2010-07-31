@@ -2,13 +2,17 @@
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 <head>
-<title>Frogmod console</title>
+<title>Frogmod admin console</title>
 <link href="/frogmod.css" rel="stylesheet" type="text/css" />
 <script type="text/javascript" src="/frogmod.js"></script>
 </head>
-<body onload="init()">
-<div id="links"><a href="/admin">admin</a> | index</div>
-<h1>Frogmod console</h1>
+<body onload="admin = true; init()">
+<div id="links"><a href="/admin">admin</a> | <a href="/">index</a></div>
+<h1 id="title">Frogmod admin console</h1>
+<h2>Info:</h2>
+<div id="info">
+Loading...
+</div>
 <h2>Status:</h2>
 <div id="status">
 Loading...
