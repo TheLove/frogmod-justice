@@ -497,6 +497,7 @@ namespace server
 			if(!strcasecmp(ext, ".jpeg")) return "image/jpeg";
 			if(!strcasecmp(ext, ".png")) return "image/png";
 			if(!strcasecmp(ext, ".gif")) return "image/gif";
+			if(!strcasecmp(ext, ".ico")) return "image/x-icon";
 		}
 		return "text";
 	}
