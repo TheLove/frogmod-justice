@@ -70,8 +70,11 @@ function update_info() {
 				if(this.status == 200) {
 					var st = eval('('+this.responseText+')');
 					if(st) {
-						var h1 = document.getElementById('title');
-						if(h1 && st.serverdesc && st.serverdesc != '') h1.innerHTML = convert_cube_string(st.serverdesc) + (admin?' admin':'') + ' console';
+						if(st.serverdesc && st.serverdesc != '') {
+							var h1 = document.getElementById('title');
+							if(h1) h1.innerHTML = convert_cube_string(st.serverdesc) + (admin?' admin':'') + ' console';
+							document.title = st.serverdesc.replace(/\f./g, '') + (admin?' admin':'') + ' console';
+						}
 
 						var html = new Array();
 						html.push('<ul>');
