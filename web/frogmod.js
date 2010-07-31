@@ -88,7 +88,10 @@ function update_players_cb(xhr) {
 				var players = eval('(' + xhr.responseText + ')');
 				if(players && players.length > 0) {
 					var html = new Array();
-					html.push('<table><tr><th>Cn</th><th>Name</th><th>Team</th><th>Status</th><th>Ping</th><th>Uptime</th>'+(admin?'<th>Actions</th>':'')+'</tr>');
+					html.push('<table><tr><th>Cn</th><th>Name</th><th>Team</th><th>Status</th>');
+					html.push('<th>Ping</th><th>Frags</th><th>Deaths</th><th>Teamkills</th><th>Shotdamage</th>');
+					html.push('<th>Damage</th><th>Effectiveness</th>');
+					html.push('<th>Uptime</th>'+(admin?'<th>Actions</th>':'')+'</tr>');
 					for(p in players) {
 						html.push('<tr class="privilege'+players[p].privilege+'">');
 						html.push('<td>'+players[p].clientnum+'</td>');
@@ -96,6 +99,12 @@ function update_players_cb(xhr) {
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
 						html.push('<td>'+players[p].ping+'</td>');
+						html.push('<td>'+players[p].frags+'</td>');
+						html.push('<td>'+players[p].deaths+'</td>');
+						html.push('<td>'+players[p].teamkills+'</td>');
+						html.push('<td>'+players[p].shotdamage+'</td>');
+						html.push('<td>'+players[p].damage+'</td>');
+						html.push('<td>'+players[p].effectiveness+'</td>');
 						html.push('<td>'+format_time(players[p].connectmillis)+'</td>');
 						if(admin) {
 							html.push('<td><a href="?kick='+players[p].clientnum+'" title="Kick">[K]</a> ');
