@@ -1,6 +1,15 @@
 body {
 	font-family: Arial, sans-serif;
-	font-size: 11px;
+	font-size: 12px;
+	color: #333;
+	background: #fff;
+}
+a {
+	color: green;
+	text-decoration: underline;
+}
+a:hover {
+	text-decoration: none;
 }
 h1 {
 	color: green;
@@ -36,3 +45,17 @@ th {
 	color: darkorange;
 }
 #links { float: right; }
+
+.left { float: left; }
+.right { float: right; }
+.clear { clear: both; }
+
+#footer {
+	padding-top: 2px;
+	border-top: 1px solid #ccc;
+	margin-top: 20px;
+	font-size: 11px;
+}
+#footer, #footer a {
+	color: #888;
+}
