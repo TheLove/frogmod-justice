@@ -519,29 +519,56 @@ namespace server
 		} else evhttp_send_error(req, 404, "Not Found");
 	}
 
-	static void httpstatuscb(struct evhttp_request *req, void *arg) {
+	static void httpinfocb(struct evhttp_request *req, void *arg) {
+		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
 		evbuffer *buf = evbuffer_new();
-		evbuffer_add_printf(buf, "{ \"totalmillis\": %d, \"mastermode\": %d, \"mastermodename\": \"%s\", \"mastermask\": %d, \"gamemode\": %d, \"gamemodename\": \"%s\", \"map\": \"%s\", \"maxclients\": %d }", totalmillis, mastermode, mastermodename(mastermode), mastermask, gamemode, modename(gamemode), smapname, maxclients);
+		evbuffer_add_printf(buf, "{ \"serverdesc\": \"%s\", \"servermotd\": \"%s\", \"maxclients\": %d }", serverdesc, servermotd, maxclients);
+		evhttp_send_reply(req, 200, "OK", buf);
+		evbuffer_free(buf);
+	}
+
+	static void httpstatuscb(struct evhttp_request *req, void *arg) {
+		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
+		evbuffer *buf = evbuffer_new();
+		evbuffer_add_printf(buf, "{ \"totalmillis\": %d, \"mastermode\": %d, \"mastermodename\": \"%s\", \"mastermask\": %d, \"gamemode\": %d, \"gamemodename\": \"%s\", \"map\": \"%s\" }", totalmillis, mastermode, mastermodename(mastermode), mastermask, gamemode, modename(gamemode), smapname);
 		evhttp_send_reply(req, 200, "OK", buf);
 		evbuffer_free(buf);
 	}
 
 	static void httpplayerscb(struct evhttp_request *req, void *arg) {
+		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
 		evbuffer *buf = evbuffer_new();
 		evbuffer_add_printf(buf, "[\n");
 		loopv(clients) {
 			clientinfo *ci = clients[i];
 			if(!ci) continue;
 			if(i > 0) evbuffer_add_printf(buf, ", ");
-			evbuffer_add_printf(buf, "\t{ \"name\": \"%s\", \"team\": \"%s\", \"clientnum\": \"%d\", \"privilege\": \"%d\", \"connectmillis\": \"%d\", \"playermodel\": \"%d\", \"authname\": \"%s\", \"ping\": \"%d\" }\n",
-				ci->name, ci->team, ci->clientnum, ci->privilege, totalmillis - ci->connectmillis, ci->playermodel, ci->authname, ci->ping); //FIXME: JSON escaping
+			evbuffer_add_printf(buf,
+				"\t{ \"name\": \"%s\", \"team\": \"%s\", \"clientnum\": %d,"
+				" \"privilege\": %d, \"connectmillis\": %d,"
+				" \"playermodel\": %d, \"authname\": \"%s\","
+				" \"ping\": %d, \"o\" : [ %f, %f, %f ],"
+				" \"state\": %d, \"editstate\": %d,"
+				" \"frags\": %d, \"flags\": %d, \"deaths\": %d,"
+				" \"teamkills\": %d, \"shotdamage\": %d,"
+				" \"damage\": %d, \"effectiveness\": %f  }\n",
+				ci->name, ci->team, ci->clientnum,
+				ci->privilege, totalmillis - ci->connectmillis,
+				ci->playermodel, ci->authname,
+				ci->ping, ci->state.o.x, ci->state.o.y, ci->state.o.z,
+				ci->state.state, ci->state.editstate,
+				ci->state.frags, ci->state.flags, ci->state.deaths,
+				ci->state.teamkills, ci->state.shotdamage,
+				ci->state.damage, ci->state.effectiveness); //FIXME: JSON escaping
 		}
 		evbuffer_add_printf(buf, "]\n");
 		evhttp_send_reply(req, 200, "OK", buf);
 		evbuffer_free(buf);
 	}
 
+	void spectator(int, int);
 	static void httpadmincb(struct evhttp_request *req, void *arg) {
+		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text/html");
 		struct evkeyvalq *k = evhttp_request_get_input_headers(req);
 		const char *auth = evhttp_find_header(k, "Authorization");
 		bool good = false;
@@ -555,10 +582,18 @@ namespace server
 			struct evkeyvalq query;
 			evhttp_parse_query(evhttp_request_get_uri(req), &query);
 			// kick
-			const char *kickme = evhttp_find_header(&query, "kick");
-			if(kickme) {
-				int cn = atoi(kickme);
+			const char *val;
+			if((val = evhttp_find_header(&query, "kick"))) {
+				int cn = atoi(val);
 				kick_client(cn);
+			}
+			else if((val = evhttp_find_header(&query, "spec"))) {
+				int cn = atoi(val);
+				spectator(cn, 1);
+			}
+			else if((val = evhttp_find_header(&query, "unspec"))) {
+				int cn = atoi(val);
+				spectator(cn, 0);
 			}
 			evbuffer *buf = evbuffer_new();
 			int len = 0;
@@ -579,6 +614,7 @@ namespace server
 	}
 
 	static void httpindexcb(struct evhttp_request *req, void *arg) {
+		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text/html");
 		evbuffer *buf = evbuffer_new();
 		int len = 0;
 		char *html = loadfile("web/index.html", &len);
@@ -597,6 +633,7 @@ namespace server
 			return;
 		}
 		evhttp_set_cb(http, "/", httpindexcb, NULL);
+		evhttp_set_cb(http, "/info", httpinfocb, NULL);
 		evhttp_set_cb(http, "/status", httpstatuscb, NULL);
 		evhttp_set_cb(http, "/players", httpplayerscb, NULL);
 		evhttp_set_cb(http, "/admin", httpadmincb, NULL);
@@ -2205,6 +2242,31 @@ namespace server
         }
     }
 
+	void spectator(int spectator, int val) {
+        clientinfo *spinfo = (clientinfo *)getclientinfo(spectator); // no bots
+        if(!spinfo || (spinfo->state.state==CS_SPECTATOR ? val : !val)) return;
+
+        if(spinfo->state.state!=CS_SPECTATOR && val)
+        {
+            if(spinfo->state.state==CS_ALIVE) suicide(spinfo);
+            if(smode) smode->leavegame(spinfo);
+            spinfo->state.state = CS_SPECTATOR;
+            spinfo->state.timeplayed += lastmillis - spinfo->state.lasttimeplayed;
+            if(!spinfo->local && !spinfo->privilege) aiman::removeai(spinfo);
+        }
+        else if(spinfo->state.state==CS_SPECTATOR && !val)
+        {
+            spinfo->state.state = CS_DEAD;
+            spinfo->state.respawn();
+            spinfo->state.lasttimeplayed = lastmillis;
+            aiman::addclient(spinfo);
+            if(spinfo->clientmap[0] || spinfo->mapcrc) checkmaps();
+            sendf(-1, 1, "ri", N_MAPRELOAD);
+        }
+        sendf(-1, 1, "ri3", N_SPECTATOR, spectator, val);
+        if(!val && mapreload && !spinfo->privilege && !spinfo->local) sendf(spectator, 1, "ri", N_MAPRELOAD);
+	}
+
 	bool processtext(clientinfo *ci, char *text) {
 		outf(1 | OUT_NOGAME, "\f1<%s> \f0%s", ci->name, text);
 		return true;
@@ -2707,30 +2769,9 @@ namespace server
 
             case N_SPECTATOR:
             {
-                int spectator = getint(p), val = getint(p);
-                if(!ci->privilege && !ci->local && (spectator!=sender || (ci->state.state==CS_SPECTATOR && mastermode>=MM_LOCKED))) break;
-                clientinfo *spinfo = (clientinfo *)getclientinfo(spectator); // no bots
-                if(!spinfo || (spinfo->state.state==CS_SPECTATOR ? val : !val)) break;
-
-                if(spinfo->state.state!=CS_SPECTATOR && val)
-                {
-                    if(spinfo->state.state==CS_ALIVE) suicide(spinfo);
-                    if(smode) smode->leavegame(spinfo);
-                    spinfo->state.state = CS_SPECTATOR;
-                    spinfo->state.timeplayed += lastmillis - spinfo->state.lasttimeplayed;
-                    if(!spinfo->local && !spinfo->privilege) aiman::removeai(spinfo);
-                }
-                else if(spinfo->state.state==CS_SPECTATOR && !val)
-                {
-                    spinfo->state.state = CS_DEAD;
-                    spinfo->state.respawn();
-                    spinfo->state.lasttimeplayed = lastmillis;
-                    aiman::addclient(spinfo);
-                    if(spinfo->clientmap[0] || spinfo->mapcrc) checkmaps();
-                    sendf(-1, 1, "ri", N_MAPRELOAD);
-                }
-                sendf(-1, 1, "ri3", N_SPECTATOR, spectator, val);
-                if(!val && mapreload && !spinfo->privilege && !spinfo->local) sendf(spectator, 1, "ri", N_MAPRELOAD);
+                int spec = getint(p), val = getint(p);
+                if(!ci->privilege && !ci->local && (spec!=sender || (ci->state.state==CS_SPECTATOR && mastermode>=MM_LOCKED))) break;
+                spectator(spec, val);
                 break;
             }
 
