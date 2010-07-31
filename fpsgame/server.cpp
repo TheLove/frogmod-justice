@@ -487,7 +487,7 @@ namespace server
 	VAR(httpport, 0, 0, 65535);
 	evhttp *http;
 
-	static const char *find_mime_type(char *filename) {
+	static const char *find_mime_type(const char *filename) {
 		const char *ext = strrchr(filename, '.');
 		if(ext) {
 			if(!strcasecmp(ext, ".css")) return "text/css";
@@ -498,21 +498,25 @@ namespace server
 			if(!strcasecmp(ext, ".png")) return "image/png";
 			if(!strcasecmp(ext, ".gif")) return "image/gif";
 			if(!strcasecmp(ext, ".ico")) return "image/x-icon";
+			if(!strcasecmp(ext, ".json")) return "application/json";
 		}
 		return "text";
 	}
 
-	static void httpgencb(struct evhttp_request *req, void *arg) {
-		char *f = (char *)evhttp_request_get_uri(req);
-		char *q = strchr(f, '?'); if(q) *q = 0; // remove ?foo=bar params
-		char *s = strrchr(f, '/'); // basename
-		if(s) f = s+1;
+	void evhttp_request_add_content_type(evhttp_request *req, const char *filename) {
+		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", find_mime_type(filename));
+	}
+
+	void evhttp_serve_file(evhttp_request *req, const char *filename) {
+		char *q = strchr((char *)filename, '?'); if(q) *q = 0; // remove ?foo=bar params
+		char *s = strrchr((char *)filename, '/'); // basename
+		if(s) filename = s+1;
 		int len;
 		char *contents = NULL;
-		defformatstring(path)("web/%s", f);
-		if(f) contents = loadfile(path, &len);
+		defformatstring(path)("web/%s", filename);
+		if(*filename) contents = loadfile(path, &len);
 		if(contents) {
-			evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", find_mime_type(f));
+			evhttp_request_add_content_type(req, filename);
 			evbuffer *buf = evbuffer_new();
 			evbuffer_add(buf, contents, len);
 			evhttp_send_reply(req, 200, "OK", buf);
@@ -520,56 +524,114 @@ namespace server
 		} else evhttp_send_error(req, 404, "Not Found");
 	}
 
-	static void httpinfocb(struct evhttp_request *req, void *arg) {
-		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
+	static void httpgencb(evhttp_request *req, void *arg) {
+		evhttp_serve_file(req, evhttp_request_get_uri(req));
+	}
+
+	void evbuffer_add_json_string(evbuffer *buf, const char *str) {
+		const char *c = str;
+		while(*c) {
+			switch(*c) {
+				case '\n': evbuffer_add_printf(buf, "\\n"); break;
+				case '\f': evbuffer_add_printf(buf, "\\f"); break;
+				case '\r': evbuffer_add_printf(buf, "\\r"); break;
+				case '"':  evbuffer_add_printf(buf, "\\\""); break;
+				case '\'':  evbuffer_add_printf(buf, "\\'"); break;
+				case '\\': evbuffer_add_printf(buf, "\\\\"); break;
+				default: evbuffer_add_printf(buf, "%c", *c); break;
+			}
+			c++;
+		}
+	}
+
+	void evbuffer_add_json_prop(evbuffer *buf, const char *name, const char *val, bool comma=true) {
+		evbuffer_add_printf(buf, "\t\"");
+		evbuffer_add_json_string(buf, name);
+		evbuffer_add_printf(buf, "\": \"");
+		evbuffer_add_json_string(buf, val);
+		evbuffer_add_printf(buf, "\"%s\n", comma?",":"");
+	}
+
+	void evbuffer_add_json_prop(evbuffer *buf, const char *name, int val, bool comma=true) {
+		evbuffer_add_printf(buf, "\t\"");
+		evbuffer_add_json_string(buf, name);
+		evbuffer_add_printf(buf, "\": %d%s\n", val, comma?",":"");
+	}
+
+	void evbuffer_add_json_prop(evbuffer *buf, const char *name, float val, bool comma=true) {
+		evbuffer_add_printf(buf, "\t\"");
+		evbuffer_add_json_string(buf, name);
+		evbuffer_add_printf(buf, "\": %f%s\n", val, comma?",":"");
+	}
+
+	void evhttp_request_redirect(evhttp_request *req, const char *url) {
+		evhttp_add_header(evhttp_request_get_output_headers(req), "Location", url);
+		evhttp_send_reply(req, 302, "Found", NULL);
+	}
+
+	static void httpinfocb(evhttp_request *req, void *arg) {
+		evhttp_request_add_content_type(req, ".json");
 		evbuffer *buf = evbuffer_new();
-		evbuffer_add_printf(buf, "{ \"serverdesc\": \"%s\", \"servermotd\": \"%s\", \"maxclients\": %d }", serverdesc, servermotd, maxclients);
+		evbuffer_add_printf(buf, "{\n");
+		evbuffer_add_json_prop(buf, "serverdesc", serverdesc);
+		evbuffer_add_json_prop(buf, "servermotd", servermotd);
+		evbuffer_add_json_prop(buf, "maxclients", maxclients, false);
+		evbuffer_add_printf(buf, "}");
 		evhttp_send_reply(req, 200, "OK", buf);
 		evbuffer_free(buf);
 	}
 
 	static void httpstatuscb(struct evhttp_request *req, void *arg) {
-		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
+		evhttp_request_add_content_type(req, ".json");
 		evbuffer *buf = evbuffer_new();
-		evbuffer_add_printf(buf, "{ \"totalmillis\": %d, \"mastermode\": %d, \"mastermodename\": \"%s\", \"mastermask\": %d, \"gamemode\": %d, \"gamemodename\": \"%s\", \"map\": \"%s\" }", totalmillis, mastermode, mastermodename(mastermode), mastermask, gamemode, modename(gamemode), smapname);
+		evbuffer_add_printf(buf, "{\n");
+		evbuffer_add_json_prop(buf, "totalmillis", totalmillis);
+		evbuffer_add_json_prop(buf, "mastermode", mastermode);
+		evbuffer_add_json_prop(buf, "mastermodename", mastermodename(mastermode));
+		evbuffer_add_json_prop(buf, "mastermask", mastermask);
+		evbuffer_add_json_prop(buf, "gamemode", gamemode);
+		evbuffer_add_json_prop(buf, "gamemodename", modename(gamemode));
+		evbuffer_add_json_prop(buf, "map", smapname, false);
+		evbuffer_add_printf(buf, "}");
 		evhttp_send_reply(req, 200, "OK", buf);
 		evbuffer_free(buf);
 	}
 
 	static void httpplayerscb(struct evhttp_request *req, void *arg) {
-		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
+		evhttp_request_add_content_type(req, ".json");
 		evbuffer *buf = evbuffer_new();
 		evbuffer_add_printf(buf, "[\n");
 		loopv(clients) {
 			clientinfo *ci = clients[i];
 			if(!ci) continue;
-			if(i > 0) evbuffer_add_printf(buf, ", ");
-			evbuffer_add_printf(buf,
-				"\t{ \"name\": \"%s\", \"team\": \"%s\", \"clientnum\": %d,"
-				" \"privilege\": %d, \"connectmillis\": %d,"
-				" \"playermodel\": %d, \"authname\": \"%s\","
-				" \"ping\": %d, \"o\" : [ %f, %f, %f ],"
-				" \"state\": %d, \"editstate\": %d,"
-				" \"frags\": %d, \"flags\": %d, \"deaths\": %d,"
-				" \"teamkills\": %d, \"shotdamage\": %d,"
-				" \"damage\": %d, \"effectiveness\": %f  }\n",
-				ci->name, ci->team, ci->clientnum,
-				ci->privilege, totalmillis - ci->connectmillis,
-				ci->playermodel, ci->authname,
-				ci->ping, ci->state.o.x, ci->state.o.y, ci->state.o.z,
-				ci->state.state, ci->state.editstate,
-				ci->state.frags, ci->state.flags, ci->state.deaths,
-				ci->state.teamkills, ci->state.shotdamage,
-				ci->state.damage, ci->state.effectiveness); //FIXME: JSON escaping
+			evbuffer_add_printf(buf, "\t{\n");
+			evbuffer_add_json_prop(buf, "name", ci->name);
+			evbuffer_add_json_prop(buf, "team", ci->team);
+			evbuffer_add_json_prop(buf, "clientnum", ci->clientnum);
+			evbuffer_add_json_prop(buf, "privilege", ci->privilege);
+			evbuffer_add_json_prop(buf, "connectmillis", totalmillis - ci->connectmillis);
+			evbuffer_add_json_prop(buf, "playermodel", ci->playermodel);
+			evbuffer_add_json_prop(buf, "authname", ci->authname);
+			evbuffer_add_json_prop(buf, "ping", ci->ping);
+			evbuffer_add_printf(buf, "\t\"o\": [ %f, %f, %f ],\n", ci->state.o.x, ci->state.o.y, ci->state.o.z);
+			evbuffer_add_json_prop(buf, "state", ci->state.state);
+			evbuffer_add_json_prop(buf, "editstate", ci->state.editstate);
+			evbuffer_add_json_prop(buf, "frags", ci->state.frags);
+			evbuffer_add_json_prop(buf, "flags", ci->state.flags);
+			evbuffer_add_json_prop(buf, "deaths", ci->state.deaths);
+			evbuffer_add_json_prop(buf, "teamkills", ci->state.teamkills);
+			evbuffer_add_json_prop(buf, "shotdamage", ci->state.shotdamage);
+			evbuffer_add_json_prop(buf, "damage", ci->state.damage);
+			evbuffer_add_json_prop(buf, "effectiveness", ci->state.effectiveness, false);
+			evbuffer_add_printf(buf, "}%s\n", (i<clients.length()-1)?",":"");
 		}
-		evbuffer_add_printf(buf, "]\n");
+		evbuffer_add_printf(buf, "]");
 		evhttp_send_reply(req, 200, "OK", buf);
 		evbuffer_free(buf);
 	}
 
 	void spectator(int, int);
 	static void httpadmincb(struct evhttp_request *req, void *arg) {
-		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text/html");
 		struct evkeyvalq *k = evhttp_request_get_input_headers(req);
 		const char *auth = evhttp_find_header(k, "Authorization");
 		bool good = false;
@@ -587,23 +649,18 @@ namespace server
 			if((val = evhttp_find_header(&query, "kick"))) {
 				int cn = atoi(val);
 				kick_client(cn);
+				evhttp_request_redirect(req, "/admin");
 			}
 			else if((val = evhttp_find_header(&query, "spec"))) {
 				int cn = atoi(val);
 				spectator(cn, 1);
+				evhttp_request_redirect(req, "/admin");
 			}
 			else if((val = evhttp_find_header(&query, "unspec"))) {
 				int cn = atoi(val);
 				spectator(cn, 0);
-			}
-			evbuffer *buf = evbuffer_new();
-			int len = 0;
-			char *html = loadfile("web/admin.html", &len);
-			if(html && len > 0) evbuffer_add(buf, html, len);
-			else evbuffer_add_printf(buf, "admin.html not found");
-//			if(kickme) evbuffer_add_printf(buf, "Kicking %d\n", atoi(kickme));
-			evhttp_send_reply(req, 200, "OK", buf);
-			evbuffer_free(buf);
+				evhttp_request_redirect(req, "/admin");
+			} else evhttp_serve_file(req, "admin.html");
 		} else {
 			struct evkeyvalq *o = evhttp_request_get_output_headers(req);
 			evhttp_add_header(o, "WWW-Authenticate", "Basic realm=\"Secure Area\"");
@@ -615,14 +672,7 @@ namespace server
 	}
 
 	static void httpindexcb(struct evhttp_request *req, void *arg) {
-		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text/html");
-		evbuffer *buf = evbuffer_new();
-		int len = 0;
-		char *html = loadfile("web/index.html", &len);
-		if(html && len > 0) evbuffer_add(buf, html, len);
-		else evbuffer_add_printf(buf, "server-index.html not found<br><a href=\"/status\">Server status</a> | <a href=\"/players\">Players</a>");
-		evhttp_send_reply(req, 200, "OK", buf);
-		evbuffer_free(buf);
+		evhttp_serve_file(req, "index.html");
 	}
 
 	void httpinit() {
@@ -640,6 +690,7 @@ namespace server
 		evhttp_set_cb(http, "/admin", httpadmincb, NULL);
 		evhttp_set_gencb(http, httpgencb, NULL);
 	}
+
 
 	void ircmsgcb(IRC::Source *source, char *msg) {
 		string buf;
