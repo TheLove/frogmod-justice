@@ -103,7 +103,7 @@ void color_sauer2console(char *src, char *dst) {
 	for(char *c = src; *c; c++) {
 		if(*c == '\f') {
 			c++;
-			if(*c >= '0' && *c <= '7') sprintf(dst + strlen(dst), "\033[1;%02dm", 30 + sauer2console[*c - '0']);
+			sprintf(dst + strlen(dst), "\033[1;%02dm", 30 + sauer2console[(*c >= '0' && *c <= '7') ? *c - '0' : 7]);
 		} else sprintf(dst + strlen(dst), "%c", *c);
 	}
 	strcat(dst, "\033[0m");
