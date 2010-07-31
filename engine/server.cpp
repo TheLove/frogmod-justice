@@ -508,7 +508,7 @@ vector<char> masterout, masterin;
 int masteroutpos = 0, masterinpos = 0;
 VARN(updatemaster, allowupdatemaster, 0, 1, 1);
 
-void disconnectmaster()
+void disconnectmaster(bool resetupdate = false)
 {
     if(mastersock != ENET_SOCKET_NULL) {
 	    enet_socket_destroy(mastersock);
@@ -522,11 +522,11 @@ void disconnectmaster()
     masteraddress.host = ENET_HOST_ANY;
     masteraddress.port = ENET_PORT_ANY;
 
-    lastupdatemaster = 0;
+    if(resetupdate) lastupdatemaster = 0;
 }
 
-SVARF(mastername, server::defaultmaster(), disconnectmaster());
-VARF(masterport, 1, server::masterport(), 0xFFFF, disconnectmaster());
+SVARF(mastername, server::defaultmaster(), disconnectmaster(true)); // these two commands are the only time we disconnect on purpose
+VARF(masterport, 1, server::masterport(), 0xFFFF, disconnectmaster(true));
 
 ENetSocket connectmaster()
 {
@@ -936,7 +936,6 @@ bool setuplistenserver(bool dedicated)
  * libevent
  ***************************/
 void evinit() {
-	printf("init libevent\n");
 	evbase = event_base_new();
 	dnsbase = evdns_base_new(evbase, 1);
 	event_base_priority_init(evbase, 10);
@@ -947,7 +946,6 @@ void evinit() {
  *  IRC
  ***************************/
 void ircinit() {
-	printf("init irc\n");
 	irc.base = evbase;
 	irc.dnsbase = dnsbase;
 }
@@ -1035,8 +1033,7 @@ bool serveroption(char *opt)
 vector<const char *> gameargs;
 
 #ifdef STANDALONE
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     if(enet_initialize()<0) fatal("Unable to initialise network module");
     atexit(enet_deinitialize);
     enet_time_set(0);
