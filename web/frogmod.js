@@ -111,6 +111,10 @@ function update_players_cb(xhr) {
 								html.push('<a href="?unspec='+players[p].clientnum+'" title="Unspec">[U]</a> ');
 							else
 								html.push('<a href="?spec='+players[p].clientnum+'" title="Spec">[S]</a> ');
+							if(players[p].privilege)
+								html.push('<a href="?takemaster=true" title="Take master">[T]</a> ');
+							else
+								html.push('<a href="?givemaster='+players[p].clientnum+'" title="Give master">[M]</a> ');
 							html.push('</td>');
 						}
 						html.push('</tr>');

@@ -631,6 +631,7 @@ namespace server
 	}
 
 	void spectator(int, int);
+    void setmaster(clientinfo *ci, bool val, const char *pass = "", const char *authname = NULL);
 	static void httpadmincb(struct evhttp_request *req, void *arg) {
 		struct evkeyvalq *k = evhttp_request_get_input_headers(req);
 		const char *auth = evhttp_find_header(k, "Authorization");
@@ -650,15 +651,26 @@ namespace server
 				int cn = atoi(val);
 				kick_client(cn);
 				evhttp_request_redirect(req, "/admin");
-			}
-			else if((val = evhttp_find_header(&query, "spec"))) {
+			} else if((val = evhttp_find_header(&query, "spec"))) {
 				int cn = atoi(val);
 				spectator(cn, 1);
 				evhttp_request_redirect(req, "/admin");
-			}
-			else if((val = evhttp_find_header(&query, "unspec"))) {
+			} else if((val = evhttp_find_header(&query, "unspec"))) {
 				int cn = atoi(val);
 				spectator(cn, 0);
+				evhttp_request_redirect(req, "/admin");
+			} else if((val = evhttp_find_header(&query, "givemaster"))) {
+				int cn = atoi(val);
+				clientinfo *ci = (clientinfo *)getclientinfo(cn);
+				if(ci) {
+					clientinfo *cm = (clientinfo *)getclientinfo(currentmaster);
+					if(cm) setmaster(cm, 0);
+					setmaster(ci, 1);
+				}
+				evhttp_request_redirect(req, "/admin");
+			} else if((evhttp_find_header(&query, "takemaster"))) {
+				clientinfo *cm = (clientinfo *)getclientinfo(currentmaster);
+				if(cm) setmaster(cm, 0);
 				evhttp_request_redirect(req, "/admin");
 			} else evhttp_serve_file(req, "admin.html");
 		} else {
@@ -1140,7 +1152,7 @@ namespace server
         if(ci->state.state==CS_SPECTATOR && !ci->local) aiman::removeai(ci);
     }
 
-    void setmaster(clientinfo *ci, bool val, const char *pass = "", const char *authname = NULL)
+    void setmaster(clientinfo *ci, bool val, const char *pass, const char *authname)
     {
         if(authname && !val) return;
         const char *name = "";
