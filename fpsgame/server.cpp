@@ -2246,22 +2246,21 @@ namespace server
         clientinfo *spinfo = (clientinfo *)getclientinfo(spectator); // no bots
         if(!spinfo || (spinfo->state.state==CS_SPECTATOR ? val : !val)) return;
 
-        if(spinfo->state.state!=CS_SPECTATOR && val)
-        {
+        if(spinfo->state.state!=CS_SPECTATOR && val) {
             if(spinfo->state.state==CS_ALIVE) suicide(spinfo);
             if(smode) smode->leavegame(spinfo);
             spinfo->state.state = CS_SPECTATOR;
             spinfo->state.timeplayed += lastmillis - spinfo->state.lasttimeplayed;
             if(!spinfo->local && !spinfo->privilege) aiman::removeai(spinfo);
-        }
-        else if(spinfo->state.state==CS_SPECTATOR && !val)
-        {
+            outf(2, "\f7%s is now a spectator", colorname(spinfo));
+        } else if(spinfo->state.state==CS_SPECTATOR && !val) {
             spinfo->state.state = CS_DEAD;
             spinfo->state.respawn();
             spinfo->state.lasttimeplayed = lastmillis;
             aiman::addclient(spinfo);
             if(spinfo->clientmap[0] || spinfo->mapcrc) checkmaps();
             sendf(-1, 1, "ri", N_MAPRELOAD);
+            outf(2, "\f7%s is no longer a spectator", colorname(spinfo));
         }
         sendf(-1, 1, "ri3", N_SPECTATOR, spectator, val);
         if(!val && mapreload && !spinfo->privilege && !spinfo->local) sendf(spectator, 1, "ri", N_MAPRELOAD);
