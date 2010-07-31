@@ -29,6 +29,38 @@ function format_time(t) {
 	return (days > 0 ? days + 'd ': '') + hours + ':' + minutes + ':' + seconds;
 }
 
+//! written by quaker66:
+//! Let's convert a Cube string colorification into proper HTML spans
+//! Accepts just one argument, returns the html string.
+
+function convert_cube_string(str) {
+    var tmp = str; // some temp we'll return later
+    var found = false; // have we found some colorz??!
+    var pos = tmp.indexOf('\f'); // first occurence of \f
+    while (pos != -1) { // loop till there is 0 occurs.
+        var color = parseInt(tmp.substr(pos + 1, 1));
+        if (found) { // if we've found something before, close the span on > 6 or any character, or close+create new on 0-6
+            if (color <= 6 && color >= 0) { // yay! color exists. It means we'll want to close last span.
+                tmp = tmp.replace(/\f[0-6]/, "</span><span class=\"color" + tmp.substr(pos + 1, 1) + "\">");
+            } else { // There is no color. It means the num is higher than 6 (or any char).
+                tmp = tmp.replace(/\f./, "</span>");
+                found = false; // pretend we've never found anything
+            }
+        } else { // if it's first occurence and its num is bigger than 6 (or any char), simply ignore.
+            if (color <= 6 && color >= 0) { // this means the num is 0-6. In that case, create our first span.
+                tmp = tmp.replace(/\f[0-6]/, "<span class=\"color" + tmp.substr(pos + 1, 1) + "\">");
+                found = true; // yay! we've found a color! (or again?)
+            }
+        }
+        pos = tmp.indexOf('\f', pos + 1); // move to next position to feed while
+    }
+    // if we've found anything lately and didn't close it with \f > 6 (or \fCHAR), let's do it at the end
+    if (found) tmp = tmp.replace(/$/, "</span>");
+
+    // we can finally return our html string.
+    return tmp;
+}
+
 function update_info() {
 	ajaxCall('/info', function() {
 		if(this.readyState == 4) {
@@ -38,12 +70,12 @@ function update_info() {
 					var st = eval('('+this.responseText+')');
 					if(st) {
 						var h1 = document.getElementById('title');
-						if(h1 && st.serverdesc && st.serverdesc != '') h1.innerHTML = st.serverdesc + (admin?' admin':'') + ' console';
+						if(h1 && st.serverdesc && st.serverdesc != '') h1.innerHTML = convert_cube_string(st.serverdesc) + (admin?' admin':'') + ' console';
 
 						var html = new Array();
 						html.push('<ul>');
-						html.push('<li>Server name: '+st.serverdesc+'</li>');
-						html.push('<li>Message of the day: '+st.servermotd+'</li>');
+						html.push('<li>Server name: '+convert_cube_string(st.serverdesc)+'</li>');
+						html.push('<li>Message of the day: '+convert_cube_string(st.servermotd)+'</li>');
 						html.push('<li>Max players: '+st.maxclients+'</li>');
 						html.push('</ul>');
 						div.innerHTML = html.join('');
@@ -92,9 +124,9 @@ function update_players_cb(xhr) {
 					html.push('<th>Damage</th><th>Effectiveness</th>');
 					html.push('<th>Uptime</th>'+(admin?'<th>Actions</th>':'')+'</tr>');
 					for(p in players) {
-						html.push('<tr class="privilege'+players[p].privilege+'">');
+						html.push('<tr'+(players[p].state == 5 ? ' class="spec"': (players[p].state == 1 ? ' class="dead"' :''))+'>');
 						html.push('<td>'+players[p].clientnum+'</td>');
-						html.push('<td>'+players[p].name+'</td>');
+						html.push('<td class="privilege'+players[p].privilege+'">'+players[p].name+'</td>');
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
 						html.push('<td>'+players[p].ping+'</td>');

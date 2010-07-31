@@ -44,6 +44,21 @@ th {
 .privilege2 {
 	color: darkorange;
 }
+
+.color0 { color: #108030 } /* 0 = green */
+.color1 { color: #4466dd } /* 1 = blue */
+.color2 { color: #ffbb3e } /* 2 = yellow */
+.color3 { color: #ff3030 } /* 3 = red */
+.color4 { color: #808080 } /* 4 = gray */
+.color5 { color: #802b9f } /* 5 = magenta */
+.color6 { color: #fc800e } /* 6 = orange */
+
+.spec {
+	color: #999;
+}
+.dead {
+	color: #666;
+}
 #links { float: right; }
 
 .left { float: left; }
