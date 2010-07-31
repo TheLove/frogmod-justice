@@ -510,7 +510,7 @@ VARN(updatemaster, allowupdatemaster, 0, 1, 1);
 
 void disconnectmaster()
 {
-    if(mastersock == ENET_SOCKET_NULL) {
+    if(mastersock != ENET_SOCKET_NULL) {
 	    enet_socket_destroy(mastersock);
 	    mastersock = ENET_SOCKET_NULL;
 	}
