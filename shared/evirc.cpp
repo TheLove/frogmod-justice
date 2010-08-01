@@ -161,7 +161,16 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 	} else if(!strcmp(command, "NOTICE")) {
 		if(client->notice_cb) client->notice_cb(this, prefix, trailing);
 	} else if(!strcmp(command, "NICK")) {
-		changenick(prefix, nparams>0?params[0]:trailing);
+		char *newnick = nparams>0?params[0]:trailing;
+		if(client->nick_cb) {
+			Source s;
+			s.server = this;
+			s.client = client;
+			s.peer = findpeer(stripident(prefix));
+			s.channel = NULL;
+			client->nick_cb(&s, newnick);
+		}
+		changenick(prefix, newnick);
 	} else if(!strcmp(command, "PART")) {
 		if(nparams >= 1) {
 			Channel *c = findchan(params[0]);
@@ -208,6 +217,15 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 		if(trailing) DEBUGF(bufferevent_write_printf(buf, "PONG %s\r\n", trailing))
 		else DEBUGF(bufferevent_write_printf(buf, "PONG\r\n"));
 		if(client->ping_cb) client->ping_cb(this, NULL, trailing);
+	} else if(!strcmp(command, "MODE")) {
+		if(client->mode_cb) {
+			Source s;
+			s.server = this;
+			s.client = client;
+			s.peer = findpeer(stripident(prefix));
+			s.channel = NULL;
+			client->mode_cb(&s, stripident(prefix), params[0], params[1], trailing);
+		}
 	} else if(isdigit(*command)) {
 		int numeric = atoi(command);
 		switch(numeric) {
@@ -252,11 +270,11 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 			}
 		}
 	} else {
-/*		printf("Server::process(prefix=[%s], command=[%s],", prefix, command);
+		printf("Server::process(prefix=[%s], command=[%s],", prefix, command);
 		for(int i = 0; i < nparams; i++) {
-			printf(" param%d=[%s]", i+1, params[i]);
+			printf(" params[%d]=[%s]", i, params[i]);
 		}
-		printf(", nparams=[%d], trailing=[%s]);\n", nparams, trailing);*/
+		printf(", nparams=[%d], trailing=[%s]);\n", nparams, trailing);
 	}
 }
 

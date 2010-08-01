@@ -140,6 +140,8 @@ struct Client {
 		part_cb = 0;
 		server_quit_cb = 0;
 		empty_cb = 0;
+		mode_cb = 0;
+		nick_cb = 0;
 	}
 
 	typedef void (*GenericCallback)(Server *, char*, char *);
@@ -148,14 +150,18 @@ struct Client {
 	typedef void (*EmptyCallback)(void);
 	typedef void (*JoinCallback)(Source *);
 	typedef void (*PartCallback)(Source *, char *reason);
+	typedef void (*ModeCallback)(Source *, char *who, char *target, char *mode, char *args);
+	typedef void (*NickCallback)(Source *, char *newnick);
 
 	MessageCallback channel_message_cb, private_message_cb;
 	MessageCallback channel_action_message_cb, private_action_message_cb;
 	GenericCallback notice_cb, motd_cb, unhandled_cb, ping_cb;
+	ModeCallback mode_cb;
 	JoinCallback join_cb;
 	PartCallback part_cb;
 	ServerQuitCallback server_quit_cb; // gets called when a server quitses
 	EmptyCallback empty_cb; // gets called when all servers are disconnected
+	NickCallback nick_cb;
 
 	bool connect(const char *host, const char *nick, int port = 6667, const char *alias = NULL);
 	void quit(const char *msg);
