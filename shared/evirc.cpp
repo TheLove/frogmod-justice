@@ -161,7 +161,7 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 	} else if(!strcmp(command, "NOTICE")) {
 		if(client->notice_cb) client->notice_cb(this, prefix, trailing);
 	} else if(!strcmp(command, "NICK")) {
-		changenick(prefix, trailing);
+		changenick(prefix, nparams>0?params[0]:trailing);
 	} else if(!strcmp(command, "PART")) {
 		if(nparams >= 1) {
 			Channel *c = findchan(params[0]);
@@ -236,7 +236,7 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 				}
 				break;
 			case 433:
-			{
+			{ //FIXME: add a callback for this
 				struct evbuffer *eb;
 				DEBUGF(eb = evbuffer_new());
 				int nl = strlen(nick);
@@ -252,11 +252,11 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 			}
 		}
 	} else {
-/*		printf("Server::process([%s], [%s],", prefix, command);
+/*		printf("Server::process(prefix=[%s], command=[%s],", prefix, command);
 		for(int i = 0; i < nparams; i++) {
-			printf(" [%s]", params[i]);
+			printf(" param%d=[%s]", i+1, params[i]);
 		}
-		printf(", [%d], [%s]);\n", nparams, trailing); */
+		printf(", nparams=[%d], trailing=[%s]);\n", nparams, trailing);*/
 	}
 }
 
