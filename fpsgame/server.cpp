@@ -715,7 +715,7 @@ namespace server
 	void ircactioncb(IRC::Source *source, char *msg) {
 		string buf;
 		color_irc2sauer(msg, buf);
-		outf(1 | OUT_NOIRC, "\f4%s \f1* %s \f7^s", source->channel->alias, source->peer->nick, msg);
+		outf(1 | OUT_NOIRC, "\f4%s \f1* %s \f7%s", source->channel->alias, source->peer->nick, msg);
 	}
 
 	void ircnoticecb(IRC::Server *s, char *prefix, char *trailing) {
