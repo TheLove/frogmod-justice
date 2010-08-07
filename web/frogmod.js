@@ -116,6 +116,11 @@ function update_status() {
 	});
 }
 
+function player_icon(model) {
+	if(model < 0 || model >= icons.length) return ''; // wot playermodel is that?!?
+	return '<img title="'+icons[model].replace('.png', '')+'" src="'+icons[model]+'">';
+}
+
 function update_players_cb(xhr) {
 	if(xhr.readyState == 4) {
 		var div = document.getElementById('players');
@@ -131,7 +136,7 @@ function update_players_cb(xhr) {
 					for(p in players) {
 						html.push('<tr'+(players[p].state == 5 ? ' class="spec"': (players[p].state == 1 ? ' class="dead"' :''))+'>');
 						html.push('<td>'+players[p].clientnum+'</td>');
-						html.push('<td class="privilege'+players[p].privilege+'"><img title="'+icons[players[p].playermodel].replace('.png', '')+'" src="'+icons[players[p].playermodel]+'">&nbsp;'+players[p].name+'</td>');
+						html.push('<td class="privilege'+players[p].privilege+'">' + player_icon(players[p].playermodel) + ' ' + players[p].name + '</td>');
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
 						html.push('<td>'+players[p].ping+'</td>');
