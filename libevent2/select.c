@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "event-config.h"
+#include "event2/event-config.h"
 
 #include <sys/types.h>
 #ifdef _EVENT_HAVE_SYS_TIME_H
@@ -192,13 +192,8 @@ select_dispatch(struct event_base *base, struct timeval *tv)
 static int
 select_resize(struct selectop *sop, int fdsz)
 {
-	int n_events, n_events_old;
-
 	fd_set *readset_in = NULL;
 	fd_set *writeset_in = NULL;
-
-	n_events = (fdsz/sizeof(fd_mask)) * NFDBITS;
-	n_events_old = (sop->event_fdsz/sizeof(fd_mask)) * NFDBITS;
 
 	if (sop->event_readset_in)
 		check_selectop(sop);

@@ -26,7 +26,7 @@
 #ifndef _EVENT_UTIL_INTERNAL_H
 #define _EVENT_UTIL_INTERNAL_H
 
-#include "event-config.h"
+#include "event2/event-config.h"
 #include <errno.h>
 
 /* For EVUTIL_ASSERT */
@@ -149,6 +149,8 @@ int evutil_read_file(const char *filename, char **content_out, size_t *len_out,
 int evutil_socket_connect(evutil_socket_t *fd_ptr, struct sockaddr *sa, int socklen);
 
 int evutil_socket_finished_connecting(evutil_socket_t fd);
+
+int evutil_ersatz_socketpair(int, int , int, evutil_socket_t[]);
 
 int evutil_resolve(int family, const char *hostname, struct sockaddr *sa,
     ev_socklen_t *socklen, int port);

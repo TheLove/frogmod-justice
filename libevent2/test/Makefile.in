@@ -38,7 +38,8 @@ host_triplet = @host@
 noinst_PROGRAMS = test-init$(EXEEXT) test-eof$(EXEEXT) \
 	test-weof$(EXEEXT) test-time$(EXEEXT) regress$(EXEEXT) \
 	bench$(EXEEXT) bench_cascade$(EXEEXT) bench_http$(EXEEXT) \
-	bench_httpclient$(EXEEXT) test-ratelim$(EXEEXT)
+	bench_httpclient$(EXEEXT) test-ratelim$(EXEEXT) \
+	test-changelist$(EXEEXT)
 @PTHREADS_TRUE@am__append_1 = ../libevent_pthreads.la
 @BUILD_WIN32_TRUE@am__append_2 = regress_iocp.c
 @OPENSSL_TRUE@am__append_3 = regress_ssl.c
@@ -53,7 +54,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/acx_pthread.m4 \
 	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.in
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
+mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
@@ -101,6 +102,9 @@ regress_DEPENDENCIES = ../libevent.la $(am__DEPENDENCIES_1) \
 regress_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(regress_CFLAGS) $(CFLAGS) \
 	$(regress_LDFLAGS) $(LDFLAGS) -o $@
+am_test_changelist_OBJECTS = test-changelist.$(OBJEXT)
+test_changelist_OBJECTS = $(am_test_changelist_OBJECTS)
+test_changelist_DEPENDENCIES = ../libevent_core.la
 am_test_eof_OBJECTS = test-eof.$(OBJEXT)
 test_eof_OBJECTS = $(am_test_eof_OBJECTS)
 test_eof_DEPENDENCIES = ../libevent_core.la
@@ -131,14 +135,16 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = $(bench_SOURCES) $(bench_cascade_SOURCES) \
 	$(bench_http_SOURCES) $(bench_httpclient_SOURCES) \
-	$(regress_SOURCES) $(test_eof_SOURCES) $(test_init_SOURCES) \
+	$(regress_SOURCES) $(test_changelist_SOURCES) \
+	$(test_eof_SOURCES) $(test_init_SOURCES) \
 	$(test_ratelim_SOURCES) $(test_time_SOURCES) \
 	$(test_weof_SOURCES)
 DIST_SOURCES = $(bench_SOURCES) $(bench_cascade_SOURCES) \
 	$(bench_http_SOURCES) $(bench_httpclient_SOURCES) \
-	$(am__regress_SOURCES_DIST) $(test_eof_SOURCES) \
-	$(test_init_SOURCES) $(test_ratelim_SOURCES) \
-	$(test_time_SOURCES) $(test_weof_SOURCES)
+	$(am__regress_SOURCES_DIST) $(test_changelist_SOURCES) \
+	$(test_eof_SOURCES) $(test_init_SOURCES) \
+	$(test_ratelim_SOURCES) $(test_time_SOURCES) \
+	$(test_weof_SOURCES)
 HEADERS = $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
@@ -197,6 +203,7 @@ PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
+PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PTHREAD_CC = @PTHREAD_CC@
@@ -263,7 +270,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign
-AM_CFLAGS = -I$(top_srcdir) -I$(top_srcdir)/compat -I$(top_srcdir)/include
+AM_CFLAGS = -I$(top_srcdir) -I$(top_srcdir)/compat -I$(top_srcdir)/include -I../include
 EXTRA_DIST = regress.rpc regress.gen.h regress.gen.c test.sh
 noinst_HEADERS = tinytest.h tinytest_macros.h regress.h
 TESTS = $(top_srcdir)/test/test.sh
@@ -272,6 +279,8 @@ test_init_SOURCES = test-init.c
 test_init_LDADD = ../libevent_core.la
 test_eof_SOURCES = test-eof.c
 test_eof_LDADD = ../libevent_core.la
+test_changelist_SOURCES = test-changelist.c
+test_changelist_LDADD = ../libevent_core.la
 test_weof_SOURCES = test-weof.c
 test_weof_LDADD = ../libevent_core.la
 test_time_SOURCES = test-time.c
@@ -290,7 +299,7 @@ regress_SOURCES = regress.c regress_buffer.c regress_http.c \
 regress_LDADD = ../libevent.la $(PTHREAD_LIBS) $(ZLIB_LIBS) \
 	$(am__append_4)
 regress_CFLAGS = -I$(top_srcdir) -I$(top_srcdir)/compat \
-	-I$(top_srcdir)/include  $(PTHREAD_CFLAGS) $(ZLIB_CFLAGS)
+	-I$(top_srcdir)/include -I../include $(PTHREAD_CFLAGS) $(ZLIB_CFLAGS)
 
 regress_LDFLAGS = $(PTHREAD_CFLAGS)
 bench_SOURCES = bench.c
@@ -361,6 +370,9 @@ bench_httpclient$(EXEEXT): $(bench_httpclient_OBJECTS) $(bench_httpclient_DEPEND
 regress$(EXEEXT): $(regress_OBJECTS) $(regress_DEPENDENCIES) 
 	@rm -f regress$(EXEEXT)
 	$(regress_LINK) $(regress_OBJECTS) $(regress_LDADD) $(LIBS)
+test-changelist$(EXEEXT): $(test_changelist_OBJECTS) $(test_changelist_DEPENDENCIES) 
+	@rm -f test-changelist$(EXEEXT)
+	$(LINK) $(test_changelist_OBJECTS) $(test_changelist_LDADD) $(LIBS)
 test-eof$(EXEEXT): $(test_eof_OBJECTS) $(test_eof_DEPENDENCIES) 
 	@rm -f test-eof$(EXEEXT)
 	$(LINK) $(test_eof_OBJECTS) $(test_eof_LDADD) $(LIBS)
@@ -405,6 +417,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_util.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_zlib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-tinytest.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-changelist.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-eof.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-init.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-ratelim.Po@am__quote@
@@ -991,7 +1004,7 @@ regress.gen.c regress.gen.h: regress.rpc $(top_srcdir)/event_rpcgen.py
 
 verify: check
 
-bench test-init test-eof test-weof test-time: ../libevent.la
+bench test-init test-eof test-weof test-time test-changelist: ../libevent.la
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

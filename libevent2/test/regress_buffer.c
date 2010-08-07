@@ -30,7 +30,7 @@
 #include <windows.h>
 #endif
 
-#include "event-config.h"
+#include "event2/event-config.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -595,7 +595,7 @@ test_evbuffer_add_file(void *ptr)
 	const char *data = "this is what we add as file system data.";
 	size_t datalen;
 	const char *compare;
-	evutil_socket_t fd, pair[2];
+	evutil_socket_t fd = -1, pair[2] = {-1, -1};
 	int r=0, n_written=0;
 
 	/* Add a test for a big file. XXXX */
@@ -617,8 +617,15 @@ test_evbuffer_add_file(void *ptr)
 		TT_DIE(("Didn't recognize the implementation"));
 	}
 
+#if defined(_EVENT_HAVE_SENDFILE) && defined(__sun__) && defined(__svr4__)
+	/* We need to use a pair of AF_INET sockets, since Solaris
+	   doesn't support sendfile() over AF_UNIX. */
+	if (evutil_ersatz_socketpair(AF_INET, SOCK_STREAM, 0, pair) == -1)
+		tt_abort_msg("ersatz_socketpair failed");
+#else
 	if (evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == -1)
 		tt_abort_msg("socketpair failed");
+#endif
 
 	datalen = strlen(data);
 	fd = regress_make_tmpfile(data, datalen);
@@ -647,8 +654,10 @@ test_evbuffer_add_file(void *ptr)
 
 	evbuffer_validate(src);
  end:
-	evutil_closesocket(pair[0]);
-	evutil_closesocket(pair[1]);
+	if (pair[0] >= 0)
+		evutil_closesocket(pair[0]);
+	if (pair[1] >= 0)
+		evutil_closesocket(pair[1]);
 	evbuffer_free(src);
 }
 

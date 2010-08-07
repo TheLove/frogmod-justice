@@ -35,7 +35,7 @@
  */
 
 #include <sys/types.h>
-#include "event-config.h"
+#include "event2/event-config.h"
 
 #ifndef _FORTIFY_SOURCE
 #define _FORTIFY_SOURCE 3
@@ -1597,14 +1597,16 @@ evdns_request_data_build(const char *const name, const int name_len,
 
 /* exported function */
 struct evdns_server_port *
-evdns_add_server_port_with_base(struct event_base *base, evutil_socket_t socket, int is_tcp, evdns_request_callback_fn_type cb, void *user_data)
+evdns_add_server_port_with_base(struct event_base *base, evutil_socket_t socket, int flags, evdns_request_callback_fn_type cb, void *user_data)
 {
 	struct evdns_server_port *port;
+	if (flags)
+		return NULL; /* flags not yet implemented */
 	if (!(port = mm_malloc(sizeof(struct evdns_server_port))))
 		return NULL;
 	memset(port, 0, sizeof(struct evdns_server_port));
 
-	EVUTIL_ASSERT(!is_tcp); /* TCP sockets not yet implemented */
+
 	port->socket = socket;
 	port->refcnt = 1;
 	port->choked = 0;
@@ -1626,9 +1628,9 @@ evdns_add_server_port_with_base(struct event_base *base, evutil_socket_t socket,
 }
 
 struct evdns_server_port *
-evdns_add_server_port(evutil_socket_t socket, int is_tcp, evdns_request_callback_fn_type cb, void *user_data)
+evdns_add_server_port(evutil_socket_t socket, int flags, evdns_request_callback_fn_type cb, void *user_data)
 {
-	return evdns_add_server_port_with_base(NULL, socket, is_tcp, cb, user_data);
+	return evdns_add_server_port_with_base(NULL, socket, flags, cb, user_data);
 }
 
 /* exported function */
@@ -1719,7 +1721,7 @@ done:
 
 /* exported function */
 int
-evdns_server_request_add_a_reply(struct evdns_server_request *req, const char *name, int n, void *addrs, int ttl)
+evdns_server_request_add_a_reply(struct evdns_server_request *req, const char *name, int n, const void *addrs, int ttl)
 {
 	return evdns_server_request_add_reply(
 		  req, EVDNS_ANSWER_SECTION, name, TYPE_A, CLASS_INET,
@@ -1728,7 +1730,7 @@ evdns_server_request_add_a_reply(struct evdns_server_request *req, const char *n
 
 /* exported function */
 int
-evdns_server_request_add_aaaa_reply(struct evdns_server_request *req, const char *name, int n, void *addrs, int ttl)
+evdns_server_request_add_aaaa_reply(struct evdns_server_request *req, const char *name, int n, const void *addrs, int ttl)
 {
 	return evdns_server_request_add_reply(
 		  req, EVDNS_ANSWER_SECTION, name, TYPE_AAAA, CLASS_INET,
@@ -1741,8 +1743,10 @@ evdns_server_request_add_ptr_reply(struct evdns_server_request *req, struct in_a
 {
 	u32 a;
 	char buf[32];
-	EVUTIL_ASSERT(in || inaddr_name);
-	EVUTIL_ASSERT(!(in && inaddr_name));
+	if (in && inaddr_name)
+		return -1;
+	else if (!in && !inaddr_name)
+		return -1;
 	if (in) {
 		a = ntohl(in->s_addr);
 		evutil_snprintf(buf, sizeof(buf), "%d.%d.%d.%d.in-addr.arpa",
@@ -2692,8 +2696,12 @@ evdns_base_resolve_ipv4(struct evdns_base *base, const char *name, int flags,
 		if (req)
 			request_submit(req);
 	} else {
-		req = search_request_new(base, handle, TYPE_A, name, flags,
-					 callback, ptr);
+		search_request_new(base, handle, TYPE_A, name, flags,
+		    callback, ptr);
+	}
+	if (handle->current_req == NULL) {
+		mm_free(handle);
+		handle = NULL;
 	}
 	EVDNS_UNLOCK(base);
 	return handle;
@@ -2726,8 +2734,12 @@ evdns_base_resolve_ipv6(struct evdns_base *base,
 		if (req)
 			request_submit(req);
 	} else {
-		req = search_request_new(base, handle, TYPE_AAAA, name, flags,
-					 callback, ptr);
+		search_request_new(base, handle, TYPE_AAAA, name, flags,
+		    callback, ptr);
+	}
+	if (handle->current_req == NULL) {
+		mm_free(handle);
+		handle = NULL;
 	}
 	EVDNS_UNLOCK(base);
 	return handle;
@@ -2760,6 +2772,10 @@ evdns_base_resolve_reverse(struct evdns_base *base, const struct in_addr *in, in
 	req = request_new(base, handle, TYPE_PTR, buf, flags, callback, ptr);
 	if (req)
 		request_submit(req);
+	if (handle->current_req == NULL) {
+		mm_free(handle);
+		handle = NULL;
+	}
 	EVDNS_UNLOCK(base);
 	return (handle);
 }
@@ -2796,6 +2812,10 @@ evdns_base_resolve_reverse_ipv6(struct evdns_base *base, const struct in6_addr *
 	req = request_new(base, handle, TYPE_PTR, buf, flags, callback, ptr);
 	if (req)
 		request_submit(req);
+	if (handle->current_req == NULL) {
+		mm_free(handle);
+		handle = NULL;
+	}
 	EVDNS_UNLOCK(base);
 	return (handle);
 }
@@ -3482,7 +3502,7 @@ load_nameservers_with_getnetworkparams(struct evdns_base *base)
 	GetNetworkParams_fn_t fn;
 
 	ASSERT_LOCKED(base);
-	if (!(handle = LoadLibraryA("iphlpapi.dll"))) {
+	if (!(handle = LoadLibrary(TEXT("iphlpapi.dll")))) {
 		log(EVDNS_LOG_WARN, "Could not open iphlpapi.dll");
 		status = -1;
 		goto done;
@@ -3548,20 +3568,20 @@ load_nameservers_with_getnetworkparams(struct evdns_base *base)
 }
 
 static int
-config_nameserver_from_reg_key(struct evdns_base *base, HKEY key, const char *subkey)
+config_nameserver_from_reg_key(struct evdns_base *base, HKEY key, const TCHAR *subkey)
 {
 	char *buf;
 	DWORD bufsz = 0, type = 0;
 	int status = 0;
 
 	ASSERT_LOCKED(base);
-	if (RegQueryValueExA(key, subkey, 0, &type, NULL, &bufsz)
+	if (RegQueryValueEx(key, subkey, 0, &type, NULL, &bufsz)
 	    != ERROR_MORE_DATA)
 		return -1;
 	if (!(buf = mm_malloc(bufsz)))
 		return -1;
 
-	if (RegQueryValueExA(key, subkey, 0, &type, (LPBYTE)buf, &bufsz)
+	if (RegQueryValueEx(key, subkey, 0, &type, (LPBYTE)buf, &bufsz)
 	    == ERROR_SUCCESS && bufsz > 1) {
 		status = evdns_nameserver_ip_add_line(base,buf);
 	}
@@ -3570,9 +3590,9 @@ config_nameserver_from_reg_key(struct evdns_base *base, HKEY key, const char *su
 	return status;
 }
 
-#define SERVICES_KEY "System\\CurrentControlSet\\Services\\"
-#define WIN_NS_9X_KEY  SERVICES_KEY "VxD\\MSTCP"
-#define WIN_NS_NT_KEY  SERVICES_KEY "Tcpip\\Parameters"
+#define SERVICES_KEY TEXT("System\\CurrentControlSet\\Services\\")
+#define WIN_NS_9X_KEY  SERVICES_KEY TEXT("VxD\\MSTCP")
+#define WIN_NS_NT_KEY  SERVICES_KEY TEXT("Tcpip\\Parameters")
 
 static int
 load_nameservers_from_registry(struct evdns_base *base)
@@ -3580,7 +3600,7 @@ load_nameservers_from_registry(struct evdns_base *base)
 	int found = 0;
 	int r;
 #define TRY(k, name) \
-	if (!found && config_nameserver_from_reg_key(base,k,name) == 0) { \
+	if (!found && config_nameserver_from_reg_key(base,k,TEXT(name)) == 0) { \
 		log(EVDNS_LOG_DEBUG,"Found nameservers in %s/%s",#k,name); \
 		found = 1;						\
 	} else if (!found) {						\
@@ -3593,12 +3613,12 @@ load_nameservers_from_registry(struct evdns_base *base)
 	if (((int)GetVersion()) > 0) { /* NT */
 		HKEY nt_key = 0, interfaces_key = 0;
 
-		if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, WIN_NS_NT_KEY, 0,
+		if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, WIN_NS_NT_KEY, 0,
 				 KEY_READ, &nt_key) != ERROR_SUCCESS) {
 			log(EVDNS_LOG_DEBUG,"Couldn't open nt key, %d",(int)GetLastError());
 			return -1;
 		}
-		r = RegOpenKeyExA(nt_key, "Interfaces", 0,
+		r = RegOpenKeyEx(nt_key, TEXT("Interfaces"), 0,
 			     KEY_QUERY_VALUE|KEY_ENUMERATE_SUB_KEYS,
 			     &interfaces_key);
 		if (r != ERROR_SUCCESS) {
@@ -3613,7 +3633,7 @@ load_nameservers_from_registry(struct evdns_base *base)
 		RegCloseKey(nt_key);
 	} else {
 		HKEY win_key = 0;
-		if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, WIN_NS_9X_KEY, 0,
+		if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, WIN_NS_9X_KEY, 0,
 				 KEY_READ, &win_key) != ERROR_SUCCESS) {
 			log(EVDNS_LOG_DEBUG, "Couldn't open registry key, %d", (int)GetLastError());
 			return -1;

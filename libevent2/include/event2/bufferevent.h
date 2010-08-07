@@ -54,7 +54,7 @@
 extern "C" {
 #endif
 
-#include <event-config.h>
+#include <event2/event-config.h>
 #ifdef _EVENT_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
@@ -424,6 +424,18 @@ void bufferevent_setwatermark(struct bufferevent *bufev, short events,
     size_t lowmark, size_t highmark);
 
 /**
+   Acquire the lock on a bufferevent.  Has no effect if locking was not
+   enabled with BEV_OPT_THREADSAFE.
+ */
+void bufferevent_lock(struct bufferevent *bufev);
+
+/**
+   Release the lock on a bufferevent.  Has no effect if locking was not
+   enabled with BEV_OPT_THREADSAFE.
+ */
+void bufferevent_unlock(struct bufferevent *bufev);
+
+/**
    Flags that can be passed into filters to let them know how to
    deal with the incoming data.
 */
@@ -523,9 +535,14 @@ bufferevent_filter_new(struct bufferevent *underlying,
    @param pair A pointer to an array to hold the two new bufferevent objects.
    @return 0 on success, -1 on failure.
  */
-int
-bufferevent_pair_new(struct event_base *base, int options,
+int bufferevent_pair_new(struct event_base *base, int options,
     struct bufferevent *pair[2]);
+
+/**
+   Given one bufferevent returned by bufferevent_pair_new(), returns the
+   other one if it still exists.  Otherwise returns NULL.
+ */
+struct bufferevent *bufferevent_pair_get_partner(struct bufferevent *bev);
 
 /**
    Abstract type used to configure rate-limiting on a bufferevent or a group
@@ -609,6 +626,26 @@ struct bufferevent_rate_limit_group *bufferevent_rate_limit_group_new(
 int bufferevent_rate_limit_group_set_cfg(
 	struct bufferevent_rate_limit_group *,
 	const struct ev_token_bucket_cfg *);
+
+/**
+   Change the smallest quantum we're willing to allocate to any single
+   bufferevent in a group for reading or writing at a time.
+
+   The rationale is that, because of TCP/IP protocol overheads and kernel
+   behavior, if a rate-limiting group is so tight on bandwidth that you're
+   only willing to send 1 byte per tick per bufferevent, you might instead
+   want to batch up the reads and writes so that you send N bytes per
+   1/N of the bufferevents (chosen at random) each tick, so you still wind
+   up send 1 byte per tick per bufferevent on average, but you don't send
+   so many tiny packets.
+
+   The default min-share is currently 64 bytes.
+
+   Returns 0 on success, -1 on faulre.
+ */
+int bufferevent_rate_limit_group_set_min_share(
+	struct bufferevent_rate_limit_group *, size_t);
+
 /**
    Free a rate-limiting group.  The group must have no members when
    this function is called.

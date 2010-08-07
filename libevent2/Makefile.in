@@ -52,7 +52,7 @@ DIST_COMMON = README $(am__configure_deps) $(dist_bin_SCRIPTS) \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(srcdir)/libevent.pc.in $(top_srcdir)/configure ChangeLog \
 	compile config.guess config.sub depcomp epoll_sub.c install-sh \
-	ltmain.sh missing mkinstalldirs
+	ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/acx_pthread.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
@@ -62,7 +62,7 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
-mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
+mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
 CONFIG_CLEAN_FILES = libevent.pc
 CONFIG_CLEAN_VPATH_FILES =
@@ -88,8 +88,7 @@ am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
-	"$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)" \
-	"$(DESTDIR)$(includedir)"
+	"$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 libevent_la_DEPENDENCIES = @LTLIBOBJS@ $(am__DEPENDENCIES_1)
@@ -140,13 +139,16 @@ libevent_core_la_OBJECTS = $(am_libevent_core_la_OBJECTS)
 libevent_core_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libevent_core_la_LDFLAGS) $(LDFLAGS) -o $@
-libevent_extra_la_DEPENDENCIES = $(MAYBE_CORE) $(am__DEPENDENCIES_1)
+@BUILD_WIN32_TRUE@am__DEPENDENCIES_2 = libevent_core.la
+libevent_extra_la_DEPENDENCIES = $(am__DEPENDENCIES_2) \
+	$(am__DEPENDENCIES_1)
 am_libevent_extra_la_OBJECTS = $(am__objects_10)
 libevent_extra_la_OBJECTS = $(am_libevent_extra_la_OBJECTS)
 libevent_extra_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libevent_extra_la_LDFLAGS) $(LDFLAGS) -o $@
-@OPENSSL_TRUE@libevent_openssl_la_DEPENDENCIES = $(MAYBE_CORE)
+@OPENSSL_TRUE@libevent_openssl_la_DEPENDENCIES =  \
+@OPENSSL_TRUE@	$(am__DEPENDENCIES_2)
 am__libevent_openssl_la_SOURCES_DIST = bufferevent_openssl.c
 @OPENSSL_TRUE@am_libevent_openssl_la_OBJECTS = bufferevent_openssl.lo
 libevent_openssl_la_OBJECTS = $(am_libevent_openssl_la_OBJECTS)
@@ -158,6 +160,9 @@ libevent_pthreads_la_LIBADD =
 am__libevent_pthreads_la_SOURCES_DIST = evthread_pthread.c
 @PTHREADS_TRUE@am_libevent_pthreads_la_OBJECTS = evthread_pthread.lo
 libevent_pthreads_la_OBJECTS = $(am_libevent_pthreads_la_OBJECTS)
+libevent_pthreads_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libevent_pthreads_la_LDFLAGS) $(LDFLAGS) -o $@
 @PTHREADS_TRUE@am_libevent_pthreads_la_rpath = -rpath $(libdir)
 SCRIPTS = $(dist_bin_SCRIPTS)
 DEFAULT_INCLUDES = -I.@am__isrc@
@@ -189,8 +194,7 @@ RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	installcheck-recursive installdirs-recursive pdf-recursive \
 	ps-recursive uninstall-recursive
 DATA = $(pkgconfig_DATA)
-HEADERS = $(include_HEADERS) $(nodist_include_HEADERS) \
-	$(noinst_HEADERS)
+HEADERS = $(include_HEADERS) $(noinst_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -287,6 +291,7 @@ PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
+PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PTHREAD_CC = @PTHREAD_CC@
@@ -358,6 +363,18 @@ top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign 1.7
 ACLOCAL_AMFLAGS = -I m4
 
+# This is the "Release" of the Libevent ABI.  It takes precedence over
+# the VERSION_INFO, so that two versions of Libevent with the same
+# "Release" are never binary-compatible.
+#
+# This number incremented once for the 2.0 release candidate, and
+# shouldn't increment again until Libevent 3.0.  Also, we shouldn't
+# increment to Libevent 3.0 unless we know in advance we're breaking
+# the ABI.
+#
+RELEASE = -release 2.0
+#RELEASE =
+
 # This is the version info for the libevent binary API.  It has three
 # numbers:
 #   Current  -- the number of the binary API that we're implementing
@@ -366,29 +383,49 @@ ACLOCAL_AMFLAGS = -I m4
 #   Age      -- How many previous binary API versions do we also
 #               support?
 #
-# If we release a new version that does not change the binary API,
-# increment Revision.
+# To increment a VERSION_INFO (current:revision:age):
+#    If the ABI didn't change:
+#        Return (current:revision+1:age)
+#    If the ABI changed, but it's backward-compatible:
+#        Return (current+1:0:age+1)
+#    If the ABI changed and it isn't backward-compatible:
+#        Return (current+1:0:0)
 #
-# If we release a new version that changes the binary API, but does
-# not break programs compiled against the old binary API, increment
-# Current and Age.  Set Revision to 0, since this is the first
-# implementation of the new API.
+# Once an RC is out, DO NOT MAKE ANY ABI-BREAKING CHANGES IN THAT SERIES.
+VERSION_INFO = 2:0:0
+
+# History:          RELEASE    VERSION_INFO
+#  2.0.1-alpha --     2.0        1:0:0
+#  2.0.2-alpha --                2:0:0
+#  2.0.3-alpha --                2:0:0  (should have incremented; didn't.)
+#  2.0.4-alpha --                3:0:0
+#  2.0.5-beta  --                4:0:0
+#  2.0.6-rc  --       2.0        2:0:0
+# Planned:
+#  2.0.7-stable --    2.0        2:1:0  (Assuming no ABI change)
 #
-# Otherwise, we're changing the binary API and breaking bakward
-# compatibility with old binaries.  Increment Current.  Set Age to 0,
-# since we're backward compatible with no previous APIs.  Set Revision
-# to 0 too.
+# If Libevent 2.1.1 makes 'struct event' etc opaque in the headers:
+#  2.1.1-alpha --     2.1        1:0:0
+# If Libevent 2.1.1 does not makes 'struct event' opaque in the headers:
+#  2.1.1-alpha --     2.1        1:0:0
+
+# ABI version history for this package effectively restarts every time
+# we change RELEASE.  Version 1.4.x had RELEASE of 1.4.
 #
-# ABI version history for this package effectively begins with package
-# version 2.0, because package version 1.4 erroneously applied both
-# -release and -version-info to the same libraries; -release takes
-# precedence, so the -version-info history of 1.4 libraries is moot.
-# We are starting the numbering at 2 rather than 1 to avoid confusion.
+# Ideally, we would not be using RELEASE at all; instead we could just
+# use the VERSION_INFO field to label our backward-incompatible ABI
+# changes, and those would be few and far between.  Unfortunately,
+# Libevent still exposes far too many volatile structures in its
+# headers, so we pretty much have to assume that most development
+# series will break ABI compatibility.  For now, it's simplest just to
+# keep incrementing the RELEASE between series and resetting VERSION_INFO.
 #
-#      2:0:0 -- Libevent 2.0.1-alpha.
-#      3:0:0 -- Libevent 2.0.4-alpha
-#      4:0:0 -- Libevent 2.0.5-beta
-VERSION_INFO = 4:0:0
+# Eventually, when we get to the point where the structures in the
+# headers are all non-changing (or not there at all!), we can shift to
+# a more normal worldview where backward-incompatible ABI changes are
+# nice and rare.  For the next couple of years, though, 'struct event'
+# is user-visible, and so we can pretty much guarantee that release
+# series won't be binary-compatible.
 dist_bin_SCRIPTS = event_rpcgen.py
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libevent.pc
@@ -425,7 +462,7 @@ SUBDIRS = . include sample test
 @BUILD_WIN32_TRUE@	$(am__append_8) $(am__append_9)
 @BUILD_WIN32_FALSE@SYS_INCLUDES = 
 @BUILD_WIN32_TRUE@SYS_INCLUDES = -IWIN32-Code
-BUILT_SOURCES = event-config.h
+BUILT_SOURCES = ./include/event2/event-config.h
 CORE_SRC = event.c evthread.c buffer.c \
 	bufferevent.c bufferevent_sock.c bufferevent_filter.c \
 	bufferevent_pair.c listener.c bufferevent_ratelim.c \
@@ -434,21 +471,23 @@ CORE_SRC = event.c evthread.c buffer.c \
 EXTRA_SRC = event_tagging.c http.c evdns.c evrpc.c
 @BUILD_WIN32_FALSE@NO_UNDEFINED = 
 @BUILD_WIN32_TRUE@NO_UNDEFINED = -no-undefined
-@BUILD_WIN32_FALSE@MAYBE_CORE = libevent_core.la
+@BUILD_WIN32_FALSE@MAYBE_CORE = 
 @BUILD_WIN32_TRUE@MAYBE_CORE = libevent_core.la
+GENERIC_LDFLAGS = -version-info $(VERSION_INFO) $(RELEASE) $(NO_UNDEFINED)
 libevent_la_SOURCES = $(CORE_SRC) $(EXTRA_SRC)
 libevent_la_LIBADD = @LTLIBOBJS@ $(SYS_LIBS)
-libevent_la_LDFLAGS = -version-info $(VERSION_INFO) $(NO_UNDEFINED)
+libevent_la_LDFLAGS = $(GENERIC_LDFLAGS)
 libevent_core_la_SOURCES = $(CORE_SRC)
 libevent_core_la_LIBADD = @LTLIBOBJS@ $(SYS_LIBS)
-libevent_core_la_LDFLAGS = -version-info $(VERSION_INFO) $(NO_UNDEFINED)
+libevent_core_la_LDFLAGS = $(GENERIC_LDFLAGS)
 @PTHREADS_TRUE@libevent_pthreads_la_SOURCES = evthread_pthread.c
+@PTHREADS_TRUE@libevent_pthreads_la_LDFLAGS = $(GENERIC_LDFLAGS)
 libevent_extra_la_SOURCES = $(EXTRA_SRC)
 libevent_extra_la_LIBADD = $(MAYBE_CORE) $(SYS_LIBS)
-libevent_extra_la_LDFLAGS = -version-info $(VERSION_INFO) $(NO_UNDEFINED)
+libevent_extra_la_LDFLAGS = $(GENERIC_LDFLAGS)
 @OPENSSL_TRUE@libevent_openssl_la_SOURCES = bufferevent_openssl.c
 @OPENSSL_TRUE@libevent_openssl_la_LIBADD = $(MAYBE_CORE) -lcrypto -lssl
-@OPENSSL_TRUE@libevent_openssl_la_LDFLAGS = -version-info $(VERSION_INFO) $(NO_UNDEFINED)
+@OPENSSL_TRUE@libevent_openssl_la_LDFLAGS = $(GENERIC_LDFLAGS)
 noinst_HEADERS = util-internal.h mm-internal.h ipv6-internal.h \
 	evrpc-internal.h strlcpy-internal.h evbuffer-internal.h \
 	bufferevent-internal.h http-internal.h event-internal.h \
@@ -456,14 +495,13 @@ noinst_HEADERS = util-internal.h mm-internal.h ipv6-internal.h \
 	minheap-internal.h log-internal.h evsignal-internal.h evmap-internal.h \
 	changelist-internal.h iocp-internal.h \
 	ratelim-internal.h \
-	WIN32-Code/event-config.h \
+	WIN32-Code/event2/event-config.h \
 	WIN32-Code/tree.h \
 	compat/sys/queue.h
 
 include_HEADERS = event.h evhttp.h evdns.h evrpc.h evutil.h
-nodist_include_HEADERS = event-config.h
-INCLUDES = -I$(srcdir)/compat -I$(srcdir)/include $(SYS_INCLUDES)
-DISTCLEANFILES = *~ event-config.h libevent.pc
+INCLUDES = -I$(srcdir)/compat -I$(srcdir)/include -I./include $(SYS_INCLUDES)
+DISTCLEANFILES = *~ libevent.pc ./include/event2/event-config.h
 all: $(BUILT_SOURCES) config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
@@ -562,7 +600,7 @@ libevent_extra.la: $(libevent_extra_la_OBJECTS) $(libevent_extra_la_DEPENDENCIES
 libevent_openssl.la: $(libevent_openssl_la_OBJECTS) $(libevent_openssl_la_DEPENDENCIES) 
 	$(libevent_openssl_la_LINK) $(am_libevent_openssl_la_rpath) $(libevent_openssl_la_OBJECTS) $(libevent_openssl_la_LIBADD) $(LIBS)
 libevent_pthreads.la: $(libevent_pthreads_la_OBJECTS) $(libevent_pthreads_la_DEPENDENCIES) 
-	$(LINK) $(am_libevent_pthreads_la_rpath) $(libevent_pthreads_la_OBJECTS) $(libevent_pthreads_la_LIBADD) $(LIBS)
+	$(libevent_pthreads_la_LINK) $(am_libevent_pthreads_la_rpath) $(libevent_pthreads_la_OBJECTS) $(libevent_pthreads_la_LIBADD) $(LIBS)
 install-dist_binSCRIPTS: $(dist_bin_SCRIPTS)
 	@$(NORMAL_INSTALL)
 	test -z "$(bindir)" || $(MKDIR_P) "$(DESTDIR)$(bindir)"
@@ -703,26 +741,6 @@ install-includeHEADERS: $(include_HEADERS)
 uninstall-includeHEADERS:
 	@$(NORMAL_UNINSTALL)
 	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
-	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	test -n "$$files" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(includedir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(includedir)" && rm -f $$files
-install-nodist_includeHEADERS: $(nodist_include_HEADERS)
-	@$(NORMAL_INSTALL)
-	test -z "$(includedir)" || $(MKDIR_P) "$(DESTDIR)$(includedir)"
-	@list='$(nodist_include_HEADERS)'; test -n "$(includedir)" || list=; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
-	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
-	done
-
-uninstall-nodist_includeHEADERS:
-	@$(NORMAL_UNINSTALL)
-	@list='$(nodist_include_HEADERS)'; test -n "$(includedir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
 	test -n "$$files" || exit 0; \
 	echo " ( cd '$(DESTDIR)$(includedir)' && rm -f" $$files ")"; \
@@ -1044,7 +1062,7 @@ check: $(BUILT_SOURCES)
 all-am: Makefile $(LTLIBRARIES) $(SCRIPTS) $(DATA) $(HEADERS) config.h
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)" "$(DESTDIR)$(includedir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: $(BUILT_SOURCES)
@@ -1099,8 +1117,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-includeHEADERS install-nodist_includeHEADERS \
-	install-pkgconfigDATA
+install-data-am: install-includeHEADERS install-pkgconfigDATA
 
 install-dvi: install-dvi-recursive
 
@@ -1149,8 +1166,7 @@ ps: ps-recursive
 ps-am:
 
 uninstall-am: uninstall-dist_binSCRIPTS uninstall-includeHEADERS \
-	uninstall-libLTLIBRARIES uninstall-nodist_includeHEADERS \
-	uninstall-pkgconfigDATA
+	uninstall-libLTLIBRARIES uninstall-pkgconfigDATA
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) all check \
 	ctags-recursive install install-am install-strip \
@@ -1168,19 +1184,19 @@ uninstall-am: uninstall-dist_binSCRIPTS uninstall-includeHEADERS \
 	install-dvi install-dvi-am install-exec install-exec-am \
 	install-html install-html-am install-includeHEADERS \
 	install-info install-info-am install-libLTLIBRARIES \
-	install-man install-nodist_includeHEADERS install-pdf \
-	install-pdf-am install-pkgconfigDATA install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	installdirs-am maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-compile mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-recursive \
-	uninstall uninstall-am uninstall-dist_binSCRIPTS \
-	uninstall-includeHEADERS uninstall-libLTLIBRARIES \
-	uninstall-nodist_includeHEADERS uninstall-pkgconfigDATA
+	install-man install-pdf install-pdf-am install-pkgconfigDATA \
+	install-ps install-ps-am install-strip installcheck \
+	installcheck-am installdirs installdirs-am maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-recursive uninstall uninstall-am \
+	uninstall-dist_binSCRIPTS uninstall-includeHEADERS \
+	uninstall-libLTLIBRARIES uninstall-pkgconfigDATA
 
 
-event-config.h: config.h
-	echo '/* event-config.h' > $@
+./include/event2/event-config.h: config.h
+	@MKDIR_P@ ./include/event2
+	echo '/* event2/event-config.h' > $@
 	echo ' *' >> $@
 	echo ' * This file was generated by autoconf when libevent was built, and post-' >> $@
 	echo ' * processed by Libevent so that its macros would have a uniform prefix.' >> $@
@@ -1189,8 +1205,8 @@ event-config.h: config.h
 	echo ' *' >> $@
 	echo ' * Do not rely on macros in this file existing in later versions.'>> $@
 	echo ' */' >> $@
-	echo '#ifndef _EVENT_CONFIG_H_' >> $@
-	echo '#define _EVENT_CONFIG_H_' >> $@
+	echo '#ifndef _EVENT2_EVENT_CONFIG_H_' >> $@
+	echo '#define _EVENT2_EVENT_CONFIG_H_' >> $@
 
 	sed -e 's/#define /#define _EVENT_/' \
 	    -e 's/#undef /#undef _EVENT_/' \

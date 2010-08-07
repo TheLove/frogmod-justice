@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <event-config.h>
+#include <event2/event-config.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/tag.h>

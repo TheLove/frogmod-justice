@@ -24,7 +24,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "event-config.h"
+#include "event2/event-config.h"
 
 #define _GNU_SOURCE
 
@@ -127,8 +127,8 @@ evutil_read_file(const char *filename, char **content_out, size_t *len_out,
 			break;
 		EVUTIL_ASSERT(read_so_far < st.st_size);
 	}
+	close(fd);
 	if (r < 0) {
-		close(fd);
 		mm_free(mem);
 		return -2;
 	}
@@ -145,6 +145,14 @@ evutil_socketpair(int family, int type, int protocol, evutil_socket_t fd[2])
 #ifndef WIN32
 	return socketpair(family, type, protocol, fd);
 #else
+	return evutil_ersatz_socketpair(family, type, protocol, fd);
+#endif
+}
+
+int
+evutil_ersatz_socketpair(int family, int type, int protocol,
+    evutil_socket_t fd[2])
+{
 	/* This code is originally from Tor.  Used with permission. */
 
 	/* This socketpair does not work when localhost is down. So
@@ -152,12 +160,17 @@ evutil_socketpair(int family, int type, int protocol, evutil_socket_t fd[2])
 	 * for now, and really, when localhost is down sometimes, we
 	 * have other problems too.
 	 */
+#ifdef WIN32
+#define ERR(e) WSA##e
+#else
+#define ERR(e) e
+#endif
 	evutil_socket_t listener = -1;
 	evutil_socket_t connector = -1;
 	evutil_socket_t acceptor = -1;
 	struct sockaddr_in listen_addr;
 	struct sockaddr_in connect_addr;
-	int size;
+	ev_socklen_t size;
 	int saved_errno = -1;
 
 	if (protocol
@@ -166,11 +179,11 @@ evutil_socketpair(int family, int type, int protocol, evutil_socket_t fd[2])
 		    && family != AF_UNIX
 #endif
 		)) {
-		EVUTIL_SET_SOCKET_ERROR(WSAEAFNOSUPPORT);
+		EVUTIL_SET_SOCKET_ERROR(ERR(EAFNOSUPPORT));
 		return -1;
 	}
 	if (!fd) {
-		EVUTIL_SET_SOCKET_ERROR(WSAEINVAL);
+		EVUTIL_SET_SOCKET_ERROR(ERR(EINVAL));
 		return -1;
 	}
 
@@ -222,10 +235,10 @@ evutil_socketpair(int family, int type, int protocol, evutil_socket_t fd[2])
 	return 0;
 
  abort_tidy_up_and_fail:
-	saved_errno = WSAECONNABORTED;
+	saved_errno = ERR(ECONNABORTED);
  tidy_up_and_fail:
 	if (saved_errno < 0)
-		saved_errno = WSAGetLastError();
+		saved_errno = EVUTIL_SOCKET_ERROR();
 	if (listener != -1)
 		evutil_closesocket(listener);
 	if (connector != -1)
@@ -235,7 +248,7 @@ evutil_socketpair(int family, int type, int protocol, evutil_socket_t fd[2])
 
 	EVUTIL_SET_SOCKET_ERROR(saved_errno);
 	return -1;
-#endif
+#undef ERR
 }
 
 int
@@ -248,7 +261,7 @@ evutil_make_socket_nonblocking(evutil_socket_t fd)
 	}
 #else
 	{
-		long flags;
+		int flags;
 		if ((flags = fcntl(fd, F_GETFL, NULL)) < 0) {
 			event_warn("fcntl(%d, F_GETFL)", fd);
 			return -1;
@@ -281,7 +294,7 @@ int
 evutil_make_socket_closeonexec(evutil_socket_t fd)
 {
 #if !defined(WIN32) && defined(_EVENT_HAVE_SETFD)
-	long flags;
+	int flags;
 	if ((flags = fcntl(fd, F_GETFD, NULL)) < 0) {
 		event_warn("fcntl(%d, F_GETFD)", fd);
 		return -1;
@@ -492,7 +505,7 @@ evutil_check_interfaces(int force_recheck)
 		/* We might have an IPv4 interface. */
 		ev_uint32_t addr = ntohl(sin_out.sin_addr.s_addr);
 		if (addr == 0 || (addr&0xff000000) == 127 ||
-		    (addr && 0xff) == 255 || (addr & 0xf0) == 14) {
+		    (addr & 0xff) == 255 || (addr & 0xf0) == 14) {
 			evutil_inet_ntop(AF_INET, &sin_out.sin_addr,
 			    buf, sizeof(buf));
 			/* This is a reserved, ipv4compat, ipv4map, loopback,
@@ -550,7 +563,6 @@ struct evutil_addrinfo *
 evutil_new_addrinfo(struct sockaddr *sa, ev_socklen_t socklen,
     const struct evutil_addrinfo *hints)
 {
-	size_t extra;
 	struct evutil_addrinfo *res;
 	EVUTIL_ASSERT(hints);
 
@@ -574,8 +586,6 @@ evutil_new_addrinfo(struct sockaddr *sa, ev_socklen_t socklen,
 	}
 
 	/* We're going to allocate extra space to hold the sockaddr. */
-	extra = (hints->ai_family == PF_INET) ? sizeof(struct sockaddr_in) :
-	    sizeof(struct sockaddr_in6);
 	res = mm_calloc(1,sizeof(struct evutil_addrinfo)+socklen);
 	if (!res)
 		return NULL;

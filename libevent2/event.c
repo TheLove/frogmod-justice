@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "event-config.h"
+#include "event2/event-config.h"
 
 #ifdef WIN32
 #include <winsock2.h>
@@ -67,6 +67,7 @@
 #include "iocp-internal.h"
 #include "changelist-internal.h"
 #include "ht-internal.h"
+#include "util-internal.h"
 
 #ifdef _EVENT_HAVE_EVENT_PORTS
 extern const struct eventop evportops;
@@ -446,7 +447,7 @@ event_is_method_disabled(const char *name)
 
 	evutil_snprintf(environment, sizeof(environment), "EVENT_NO%s", name);
 	for (i = 8; environment[i] != '\0'; ++i)
-		environment[i] = toupper(environment[i]);
+		environment[i] = EVUTIL_TOUPPER(environment[i]);
 	/* Note that evutil_getenv() ignores the environment entirely if
 	 * we're setuid */
 	return (evutil_getenv(environment) != NULL);
@@ -533,7 +534,6 @@ event_base_new_with_config(const struct event_config *cfg)
 		event_warn("%s: calloc", __func__);
 		return NULL;
 	}
-
 	detect_monotonic();
 	gettime(base, &base->event_tv);
 
@@ -541,6 +541,8 @@ event_base_new_with_config(const struct event_config *cfg)
 	TAILQ_INIT(&base->eventqueue);
 	base->sig.ev_signal_pair[0] = -1;
 	base->sig.ev_signal_pair[1] = -1;
+	base->th_notify_fd[0] = -1;
+	base->th_notify_fd[1] = -1;
 
 	event_deferred_cb_queue_init(&base->defer_queue);
 	base->defer_queue.notify_fn = notify_base_cbq_callback;
@@ -595,8 +597,6 @@ event_base_new_with_config(const struct event_config *cfg)
 	}
 
 	/* prepare for threading */
-	base->th_notify_fd[0] = -1;
-	base->th_notify_fd[1] = -1;
 
 #ifndef _EVENT_DISABLE_THREAD_SUPPORT
 	if (!cfg || !(cfg->flags & EVENT_BASE_FLAG_NOLOCK)) {
@@ -955,6 +955,8 @@ event_signal_closure(struct event_base *base, struct event *ev)
 	while (ncalls) {
 		ncalls--;
 		ev->ev_ncalls = ncalls;
+		if (ncalls == 0)
+			ev->ev_pncalls = NULL;
 		(*ev->ev_callback)((int)ev->ev_fd, ev->ev_res, ev->ev_arg);
 #if 0
 		/* XXXX we can't do this without a lock on the base. */
@@ -1836,7 +1838,7 @@ evthread_notify_base_default(struct event_base *base)
 #else
 	r = write(base->th_notify_fd[1], buf, 1);
 #endif
-	return (r < 0) ? -1 : 0;
+	return (r < 0 && errno != EAGAIN) ? -1 : 0;
 }
 
 #if defined(_EVENT_HAVE_EVENTFD) && defined(_EVENT_HAVE_SYS_EVENTFD_H)
@@ -1877,6 +1879,7 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 	struct event_base *base = ev->ev_base;
 	int res = 0;
 	int notify = 0;
+	int need_cur_lock;
 
 	EVENT_BASE_ASSERT_LOCKED(base);
 	_event_debug_assert_is_setup(ev);
@@ -1900,6 +1903,15 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 			1 + min_heap_size(&base->timeheap)) == -1)
 			return (-1);  /* ENOMEM == errno */
 	}
+
+	/* If the main thread is currently executing a signal event's
+	 * callback, and we are not the main thread, then we want to wait
+	 * until the callback is done before we mess with the event, or else
+	 * we can race on ev_ncalls and ev_pncalls below. */
+	need_cur_lock = (base->current_event == ev) &&
+	    (ev->ev_events & EV_SIGNAL);
+	if (need_cur_lock)
+		EVBASE_ACQUIRE_LOCK(base, current_event_lock);
 
 	if ((ev->ev_events & (EV_READ|EV_WRITE|EV_SIGNAL)) &&
 	    !(ev->ev_flags & (EVLIST_INSERTED|EVLIST_ACTIVE))) {
@@ -2003,6 +2015,9 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 		evthread_notify_base(base);
 
 	_event_debug_note_add(ev);
+
+	if (need_cur_lock)
+		EVBASE_RELEASE_LOCK(base, current_event_lock);
 
 	return (res);
 }
@@ -2114,6 +2129,7 @@ void
 event_active_nolock(struct event *ev, int res, short ncalls)
 {
 	struct event_base *base;
+	int need_cur_lock = 0;
 
 	/* We get different kinds of events, add them together */
 	if (ev->ev_flags & EVLIST_ACTIVE) {
@@ -2128,11 +2144,16 @@ event_active_nolock(struct event *ev, int res, short ncalls)
 	ev->ev_res = res;
 
 	if (ev->ev_events & EV_SIGNAL) {
+		need_cur_lock = (base->current_event == ev);
+		if (need_cur_lock)
+			EVBASE_ACQUIRE_LOCK(base, current_event_lock);
 		ev->ev_ncalls = ncalls;
 		ev->ev_pncalls = NULL;
 	}
 
 	event_queue_insert(base, ev, EVLIST_ACTIVE);
+	if (need_cur_lock)
+		EVBASE_RELEASE_LOCK(base, current_event_lock);
 }
 
 void
@@ -2537,7 +2558,7 @@ evthread_notify_drain_eventfd(evutil_socket_t fd, short what, void *arg)
 static void
 evthread_notify_drain_default(evutil_socket_t fd, short what, void *arg)
 {
-	unsigned char buf[128];
+	unsigned char buf[1024];
 #ifdef WIN32
 	while (recv(fd, (char*)buf, sizeof(buf), 0) > 0)
 		;
@@ -2565,16 +2586,15 @@ evthread_make_base_notifiable(struct event_base *base)
 	if (base->th_notify_fd[0] >= 0) {
 		notify = evthread_notify_base_eventfd;
 		cb = evthread_notify_drain_eventfd;
-	} else
+	}
 #endif
 #if defined(_EVENT_HAVE_PIPE)
-	{
+	if (base->th_notify_fd[0] < 0) {
 		if ((base->evsel->features & EV_FEATURE_FDS)) {
 			if (pipe(base->th_notify_fd) < 0)
 				event_warn("%s: pipe", __func__);
 		}
 	}
-	if (base->th_notify_fd[0] < 0)
 #endif
 
 #ifdef WIN32
@@ -2582,7 +2602,7 @@ evthread_make_base_notifiable(struct event_base *base)
 #else
 #define LOCAL_SOCKETPAIR_AF AF_UNIX
 #endif
-	{
+	if (base->th_notify_fd[0] < 0) {
 		if (evutil_socketpair(LOCAL_SOCKETPAIR_AF, SOCK_STREAM, 0,
 			base->th_notify_fd) == -1) {
 			event_sock_warn(-1, "%s: socketpair", __func__);
@@ -2595,10 +2615,15 @@ evthread_make_base_notifiable(struct event_base *base)
 	base->th_notify_fn = notify;
 
 	/*
-	  This can't be right, can it?  We want writes to this socket to
-	  just succeed.
-	  evutil_make_socket_nonblocking(base->th_notify_fd[1]);
+	  Making the second socket nonblocking is a bit subtle, given that we
+	  ignore any EAGAIN returns when writing to it, and you don't usally
+	  do that for a nonblocking socket. But if the kernel gives us EAGAIN,
+	  then there's no need to add any more data to the buffer, since
+	  the main thread is already either about to wake up and drain it,
+	  or woken up and in the process of draining it.
 	*/
+	if (base->th_notify_fd[1] > 0)
+		evutil_make_socket_nonblocking(base->th_notify_fd[1]);
 
 	/* prepare an event that we can use for wakeup */
 	event_assign(&base->th_notify, base, base->th_notify_fd[0],

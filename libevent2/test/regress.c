@@ -30,7 +30,7 @@
 #include <windows.h>
 #endif
 
-#include "event-config.h"
+#include "event2/event-config.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -62,6 +62,7 @@
 #include "event2/buffer_compat.h"
 #include "event2/util.h"
 #include "event-internal.h"
+#include "util-internal.h"
 #include "log-internal.h"
 
 #include "regress.h"
@@ -297,54 +298,14 @@ combined_write_cb(evutil_socket_t fd, short event, void *arg)
 		exit(1);
 }
 
-/* Test infrastructure */
-
-static int
-setup_test(const char *name)
-{
-	if (in_legacy_test_wrapper)
-		return 0;
-
-	fprintf(stdout, "%s", name);
-
-	if (evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == -1) {
-		fprintf(stderr, "%s: socketpair\n", __func__);
-		exit(1);
-	}
-
-	if (evutil_make_socket_nonblocking(pair[0]) == -1)
-		fprintf(stderr, "fcntl(O_NONBLOCK)");
-
-	if (evutil_make_socket_nonblocking(pair[1]) == -1)
-		fprintf(stderr, "fcntl(O_NONBLOCK)");
-
-	test_ok = 0;
-	called = 0;
-	return (0);
-}
-
-static int
-cleanup_test(void)
-{
-	if (in_legacy_test_wrapper)
-		return 0;
-
-#ifndef WIN32
-	close(pair[0]);
-	close(pair[1]);
-#else
-	CloseHandle((HANDLE)pair[0]);
-	CloseHandle((HANDLE)pair[1]);
-#endif
-	if (test_ok)
-		fprintf(stdout, "OK\n");
-	else {
-		fprintf(stdout, "FAILED\n");
-		exit(1);
-	}
-	test_ok = 0;
-	return (0);
-}
+/* These macros used to replicate the work of the legacy test wrapper code */
+#define setup_test(x) do {						\
+	if (!in_legacy_test_wrapper) {					\
+		TT_FAIL(("Legacy test %s not wrapped properly", x));	\
+		return;							\
+	}								\
+	} while (0)
+#define cleanup_test() setup_test("cleanup")
 
 static void
 test_simpleread(void)
@@ -409,6 +370,112 @@ test_simpleread_multiple(void)
 
 	cleanup_test();
 }
+
+static int have_closed = 0;
+static int premature_event = 0;
+static void
+simpleclose_close_fd_cb(evutil_socket_t s, short what, void *ptr)
+{
+	evutil_socket_t **fds = ptr;
+	TT_BLATHER(("Closing"));
+	evutil_closesocket(*fds[0]);
+	evutil_closesocket(*fds[1]);
+	*fds[0] = -1;
+	*fds[1] = -1;
+	have_closed = 1;
+}
+
+static void
+record_event_cb(evutil_socket_t s, short what, void *ptr)
+{
+	short *whatp = ptr;
+	if (!have_closed)
+		premature_event = 1;
+	*whatp = what;
+	TT_BLATHER(("Recorded %d on socket %d", (int)what, (int)s));
+}
+
+static void
+test_simpleclose(void *ptr)
+{
+	/* Test that a close of FD is detected as a read and as a write. */
+	struct event_base *base = event_base_new();
+	evutil_socket_t pair1[2]={-1,-1}, pair2[2] = {-1, -1};
+	evutil_socket_t *to_close[2];
+	struct event *rev=NULL, *wev=NULL, *closeev=NULL;
+	struct timeval tv;
+	short got_read_on_close = 0, got_write_on_close = 0;
+	char buf[1024];
+	memset(buf, 99, sizeof(buf));
+#ifdef WIN32
+#define LOCAL_SOCKETPAIR_AF AF_INET
+#else
+#define LOCAL_SOCKETPAIR_AF AF_UNIX
+#endif
+	if (evutil_socketpair(LOCAL_SOCKETPAIR_AF, SOCK_STREAM, 0, pair1)<0)
+		TT_DIE(("socketpair: %s", strerror(errno)));
+	if (evutil_socketpair(LOCAL_SOCKETPAIR_AF, SOCK_STREAM, 0, pair2)<0)
+		TT_DIE(("socketpair: %s", strerror(errno)));
+	if (evutil_make_socket_nonblocking(pair1[1]) < 0)
+		TT_DIE(("make_socket_nonblocking"));
+	if (evutil_make_socket_nonblocking(pair2[1]) < 0)
+		TT_DIE(("make_socket_nonblocking"));
+
+	/** Stuff pair2[1] full of data, until write fails */
+	while (1) {
+		int r = write(pair2[1], buf, sizeof(buf));
+		if (r<0) {
+			int err = evutil_socket_geterror(pair2[1]);
+			if (! EVUTIL_ERR_RW_RETRIABLE(err))
+				TT_DIE(("write failed strangely: %s",
+					evutil_socket_error_to_string(err)));
+			break;
+		}
+	}
+	to_close[0] = &pair1[0];
+	to_close[1] = &pair2[0];
+
+	closeev = event_new(base, -1, EV_TIMEOUT, simpleclose_close_fd_cb,
+	    to_close);
+	rev = event_new(base, pair1[1], EV_READ, record_event_cb,
+	    &got_read_on_close);
+	TT_BLATHER(("Waiting for read on %d", (int)pair1[1]));
+	wev = event_new(base, pair2[1], EV_WRITE, record_event_cb,
+	    &got_write_on_close);
+	TT_BLATHER(("Waiting for write on %d", (int)pair2[1]));
+	tv.tv_sec = 0;
+	tv.tv_usec = 100*1000; /* Close pair1[0] after a little while, and make
+			       * sure we get a read event. */
+	event_add(closeev, &tv);
+	event_add(rev, NULL);
+	event_add(wev, NULL);
+	/* Don't let the test go on too long. */
+	tv.tv_sec = 0;
+	tv.tv_usec = 200*1000;
+	event_base_loopexit(base, &tv);
+	event_base_loop(base, 0);
+
+	tt_int_op(got_read_on_close, ==, EV_READ);
+	tt_int_op(got_write_on_close, ==, EV_WRITE);
+	tt_int_op(premature_event, ==, 0);
+
+end:
+	if (pair1[0] >= 0)
+		evutil_closesocket(pair1[0]);
+	if (pair1[1] >= 0)
+		evutil_closesocket(pair1[1]);
+	if (pair2[0] >= 0)
+		evutil_closesocket(pair2[0]);
+	if (pair2[1] >= 0)
+		evutil_closesocket(pair2[1]);
+	if (rev)
+		event_free(rev);
+	if (closeev)
+		event_free(closeev);
+	if (base)
+		event_base_free(base);
+}
+
 
 static void
 test_multiple(void)
@@ -876,7 +943,6 @@ test_immediatesignal(void)
 	struct event ev;
 
 	test_ok = 0;
-	printf("Immediate signal: ");
 	evsignal_set(&ev, SIGUSR1, signal_cb, &ev);
 	evsignal_add(&ev, NULL);
 	raise(SIGUSR1);
@@ -891,7 +957,6 @@ test_signal_dealloc(void)
 	/* make sure that evsignal_event is event_del'ed and pipe closed */
 	struct event ev;
 	struct event_base *base = event_init();
-	printf("Signal dealloc: ");
 	evsignal_set(&ev, SIGUSR1, signal_cb, &ev);
 	evsignal_add(&ev, NULL);
 	evsignal_del(&ev);
@@ -908,7 +973,6 @@ test_signal_pipeloss(void)
 	struct event_base *base1, *base2;
 	int pipe1;
 	test_ok = 0;
-	printf("Signal pipeloss: ");
 	base1 = event_init();
 	pipe1 = base1->sig.ev_signal_pair[0];
 	base2 = event_init();
@@ -936,7 +1000,6 @@ test_signal_switchbase(void)
 	struct event_base *base1, *base2;
 	int is_kqueue;
 	test_ok = 0;
-	printf("Signal switchbase: ");
 	base1 = event_init();
 	base2 = event_init();
 	is_kqueue = !strcmp(event_get_method(),"kqueue");
@@ -988,7 +1051,6 @@ test_signal_assert(void)
 	struct event ev;
 	struct event_base *base = event_init();
 	test_ok = 0;
-	printf("Signal handler assert: ");
 	/* use SIGCONT so we don't kill ourselves when we signal to nowhere */
 	evsignal_set(&ev, SIGCONT, signal_cb, &ev);
 	evsignal_add(&ev, NULL);
@@ -1023,7 +1085,6 @@ test_signal_restore(void)
 #endif
 
 	test_ok = 0;
-	printf("Signal handler restore: ");
 #ifdef _EVENT_HAVE_SIGACTION
 	sa.sa_handler = signal_cb_sa;
 	sa.sa_flags = 0x0;
@@ -1814,7 +1875,7 @@ methodname_to_envvar(const char *mname, char *buf, size_t buflen)
 	char *cp;
 	evutil_snprintf(buf, buflen, "EVENT_NO%s", mname);
 	for (cp = buf; *cp; ++cp) {
-		*cp = toupper(*cp);
+		*cp = EVUTIL_TOUPPER(*cp);
 	}
 }
 #endif
@@ -2106,6 +2167,14 @@ end:
 #undef MANY
 }
 
+static void
+test_struct_event_size(void *arg)
+{
+	tt_int_op(event_get_struct_event_size(), <=, sizeof(struct event));
+end:
+	;
+}
+
 struct testcase_t main_testcases[] = {
 	/* Some converted-over tests */
 	{ "methods", test_methods, TT_FORK, NULL, NULL },
@@ -2133,6 +2202,8 @@ struct testcase_t main_testcases[] = {
 	LEGACY(simpleread, TT_ISOLATED),
 	LEGACY(simpleread_multiple, TT_ISOLATED),
 	LEGACY(simplewrite, TT_ISOLATED),
+	{ "simpleclose", test_simpleclose, TT_FORK, &basic_setup,
+	  NULL },
 	LEGACY(multiple, TT_ISOLATED),
 	LEGACY(persistent, TT_ISOLATED),
 	LEGACY(combined, TT_ISOLATED),
@@ -2148,6 +2219,8 @@ struct testcase_t main_testcases[] = {
 	  NULL },
 	{ "mm_functions", test_mm_functions, TT_FORK, NULL, NULL },
 	BASIC(many_events, TT_ISOLATED),
+
+	{ "struct_event_size", test_struct_event_size, 0, NULL, NULL },
 
 #ifndef WIN32
 	LEGACY(fork, TT_ISOLATED),

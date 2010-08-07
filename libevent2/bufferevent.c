@@ -27,7 +27,7 @@
 
 #include <sys/types.h>
 
-#include "event-config.h"
+#include "event2/event-config.h"
 
 #ifdef _EVENT_HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -824,4 +824,18 @@ _bufferevent_add_event(struct event *ev, const struct timeval *tv)
 		return event_add(ev, NULL);
 	else
 		return event_add(ev, tv);
+}
+
+/* For use by user programs only; internally, we should be calling
+   either _bufferevent_incref_and_lock(), or BEV_LOCK. */
+void
+bufferevent_lock(struct bufferevent *bev)
+{
+	_bufferevent_incref_and_lock(bev);
+}
+
+void
+bufferevent_unlock(struct bufferevent *bev)
+{
+	_bufferevent_decref_and_unlock(bev);
 }
