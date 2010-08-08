@@ -633,7 +633,8 @@ namespace server
 	}
 
 	void spectator(int, int);
-    void setmaster(clientinfo *ci, bool val, const char *pass = "", const char *authname = NULL);
+	void setmaster(clientinfo *ci, bool val, const char *pass = "", const char *authname = NULL);
+	void kick_client(int cn, clientinfo *m = NULL);
 	static void httpadmincb(struct evhttp_request *req, void *arg) {
 		struct evkeyvalq *k = evhttp_request_get_input_headers(req);
 		const char *auth = evhttp_find_header(k, "Authorization");
@@ -2377,12 +2378,15 @@ namespace server
         }
     }
 
-    void kick_client(int victim) {
-        if(getclientinfo(victim)) { // no bots
+    void kick_client(int victim, clientinfo *m) {
+    	clientinfo *ci = (clientinfo *)getclientinfo(victim);
+        if(ci) { // no bots
             ban &b = bannedips.add();
             b.time = totalmillis;
             b.ip = getclientip(victim);
             allowedips.removeobj(b.ip);
+            defformatstring(mil)("%d", totalmillis - ci->connectmillis);
+            http_post_event("action", "kick", "name", ci->name, "ip", getclienthostname(victim), "millis", mil, "kicker", m?m->name:"", "kicker_ip", m?getclienthostname(m->clientnum):"", NULL);
             disconnect_client(victim, DISC_KICK);
         }
     }
@@ -2909,7 +2913,7 @@ namespace server
             case N_KICK:
             {
                 int victim = getint(p);
-                if((ci->privilege || ci->local) && ci->clientnum!=victim) kick_client(victim);
+                if((ci->privilege || ci->local) && ci->clientnum!=victim) kick_client(victim, ci);
                 break;
             }
 
