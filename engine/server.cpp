@@ -842,11 +842,8 @@ static void update_server(int fd, short e, void *arg) {
 	to.tv_usec = 5000;
 	evtimer_add(&update_event, &to);
 
-    if(!lastupdatemaster || (totalmillis-lastupdatemaster) > 3600000) {      // send alive signal to masterserver every hour of uptime
-		printf("update_server totalmillis=%d lastupdatemaster=%d totalmillis-lastupdatemaster=%d %d=60*60*1000\n",
-			totalmillis, lastupdatemaster, totalmillis - lastupdatemaster, 60*60*1000);
+    if(!lastupdatemaster || (totalmillis-lastupdatemaster) > 3600000)      // send alive signal to masterserver every hour of uptime
         updatemasterserver();
-    }
 
     localclients = nonlocalclients = 0;
     loopv(clients) switch(clients[i]->type)
