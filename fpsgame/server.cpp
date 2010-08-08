@@ -751,7 +751,7 @@ namespace server
 	void ircmsgcb(IRC::Source *source, char *msg) {
 		string buf;
 		color_irc2sauer(msg, buf);
-		outf(1 | OUT_NOIRC, "\f4%s \f2<%s> \f7%s", source->channel->alias, source->peer->nick, msg);
+		outf(1 | OUT_NOIRC, "\f4%s \f2<%s> \f7%s", source->channel?source->channel->alias:"", source->peer->nick, msg);
 	}
 
 	void ircactioncb(IRC::Source *source, char *msg) {

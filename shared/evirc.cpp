@@ -91,13 +91,13 @@ void Server::quit(const char *msg, int quitsecs) {
 	}
 }
 
-void Server::join(const char *channel, int verbosity_, const char *alias_) {
-	bool add = true;
+void Server::join(const char *channel, int verbosity_, const char *alias_, const char *pwd_) {
+	Channel *c = NULL;
 	for(unsigned int i = 0; i < channels.size(); i++) {
-		if(!strcmp(channels[i]->name, channel)) add=false; // don't join an existing channel
+		if(!strcmp(channels[i]->name, channel)) c = channels[i]; // don't join an existing channel
 	}
-	if(add) {
-		Channel *c = new Channel;
+	if(!c) {
+		c = new Channel;
 		c->name = strdup(channel);
 		if(alias_) c->alias = strdup(alias_);
 		else {
@@ -107,10 +107,11 @@ void Server::join(const char *channel, int verbosity_, const char *alias_) {
 		}
 		c->server = this;
 		c->verbosity = verbosity_;
+		c->pwd = (pwd_&&*pwd_)?strdup(pwd_):NULL;
 		channels.push_back(c);
 	}
 	if(state == Active)
-		DEBUGF(bufferevent_write_printf(buf, "JOIN %s\r\n", channel));
+		DEBUGF(bufferevent_write_printf(buf, "JOIN %s %s\r\n", c->name, c->pwd?c->pwd:""));
 }
 
 void Server::part(const char *channel) {

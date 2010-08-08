@@ -41,6 +41,7 @@ struct Server;
 struct Channel {
 	char *name;
 	char *alias;
+	char *pwd;
 	std::vector <ChannelPeer *> peers;
 	int verbosity;
 	Server *server;
@@ -76,7 +77,7 @@ struct Server {
 
 	bool connect(const char *host, const char *nick, int port = 6667, const char *alias = NULL);
 	void quit(const char *msg = NULL, int quitsecs = 1); // quit with a message, force disconnect after quitsecs seconds
-	void join(const char *channel, int verbosity_ = 0, const char *alias = NULL);
+	void join(const char *channel, int verbosity_ = 0, const char *alias = NULL, const char *pwd = NULL);
 	void part(const char *channel);
 	void read(void);
 
@@ -183,9 +184,9 @@ struct Client {
 		}
 		return false;
 	}
-	void join(const char *host, const char *channel, int verbosity = 0, const char *alias = NULL) {
+	void join(const char *host, const char *channel, int verbosity = 0, const char *alias = NULL, const char *pwd = NULL) {
 		Server *s = findserv(host);
-		if(s) s->join(channel, verbosity, alias);
+		if(s) s->join(channel, verbosity, alias, pwd);
 	}
 	void part(const char *host, const char *channel) {
 		Server *s = findserv(host);

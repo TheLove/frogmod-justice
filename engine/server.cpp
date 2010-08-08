@@ -10,7 +10,7 @@ static event pongsock_input_event;
 static event lansock_input_event;
 static event update_event;
 static event netstats_event;
-static event stdin_event;
+//static event stdin_event;
 IRC::Client irc;
 
 #ifdef STANDALONE
@@ -948,14 +948,14 @@ void ircinit() {
 ICOMMAND(ircconnect, "ssis", (const char *s, const char *n, int *p, const char *a), {
 	if(s && *s && n && *n) irc.connect(s, n, (p&&*p)?*p:6667, (a&&*a)?a:NULL);
 });
-ICOMMAND(ircjoin, "ssis", (const char *s, const char *c, const int *v, const char *a), {
-	if(s && *s && c && *c) irc.join(s, c, (v&&*v)?*v:0, (a&&*a)?a:NULL);
+ICOMMAND(ircjoin, "ssiss", (const char *s, const char *c, const int *v, const char *a, const char *p), {
+	if(s && *s && c && *c) irc.join(s, c, (v&&*v)?*v:0, (a&&*a)?a:NULL, (p&&*p)?p:NULL);
 });
 ICOMMAND(ircpart, "ss", (const char *s, const char *c), {
 	if(s && *s && c && *c) irc.part(s, c);
 });
 ICOMMAND(ircecho, "C", (const char *msg), {
-	string buf;
+//	string buf;
 //	color_sauer2irc((char *)msg, buf);
 //	if(scriptircsource) scriptircsource->speak(buf);
 });
