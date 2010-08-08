@@ -2880,16 +2880,14 @@ namespace server
                 {
                     if((ci->privilege>=PRIV_ADMIN || ci->local) || (mastermask&(1<<mm)))
                     {
-                    	outf(2, "\f4Mastermode is now \f5%s\f4 (%d)", mastermodename(mastermode), mastermode);
                         mastermode = mm;
+                    	outf(2 | OUT_NOGAME, "\f4Mastermode is now \f5%s\f4 (%d)", mastermodename(mastermode), mastermode);
                         allowedips.shrink(0);
                         if(mm>=MM_PRIVATE)
                         {
                             loopv(clients) allowedips.add(getclientip(clients[i]->clientnum));
                         }
                         sendf(-1, 1, "rii", N_MASTERMODE, mastermode);
-                        //defformatstring(s)("mastermode is now %s (%d)", mastermodename(mastermode), mastermode);
-                        //sendservmsg(s);
                     }
                     else
                     {
