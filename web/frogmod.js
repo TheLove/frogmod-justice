@@ -148,15 +148,15 @@ function update_players_cb(xhr) {
 						html.push('<td>'+players[p].effectiveness+'</td>');
 						html.push('<td>'+format_time(players[p].connectmillis)+'</td>');
 						if(admin) {
-							html.push('<td><a href="?kick='+players[p].clientnum+'" title="Kick">[K]</a> ');
+							html.push('<td><a href="?kick='+players[p].clientnum+'" title="Kick"><img src="kick.png" alt="[K]"></a> ');
 							if(players[p].state == 5)
-								html.push('<a href="?unspec='+players[p].clientnum+'" title="Unspec">[U]</a> ');
+								html.push('<a href="?unspec='+players[p].clientnum+'" title="Unspec"><img src="unspec.png" alt="[U]"</a> ');
 							else
-								html.push('<a href="?spec='+players[p].clientnum+'" title="Spec">[S]</a> ');
+								html.push('<a href="?spec='+players[p].clientnum+'" title="Spec"><img src="spec.png" alt="[S]"></a> ');
 							if(players[p].privilege)
-								html.push('<a href="?takemaster=true" title="Take master">[T]</a> ');
+								html.push('<a href="?takemaster=true" title="Take master"><img src="takemaster.png" alt="[T]"</a> ');
 							else
-								html.push('<a href="?givemaster='+players[p].clientnum+'" title="Give master">[M]</a> ');
+								html.push('<a href="?givemaster='+players[p].clientnum+'" title="Give master"><img src="givemaster.png" alt="[M]"></a> ');
 							html.push('</td>');
 						}
 						html.push('</tr>');
