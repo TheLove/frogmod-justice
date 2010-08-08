@@ -969,4 +969,45 @@ void bufferevent_write_printf(struct bufferevent *be, const char *fmt, ...);
 void bufferevent_write_vprintf(struct bufferevent *be, const char *fmt, va_list ap);
 char *evbuffer_readln_nul(struct evbuffer *buffer, size_t *n_read_out, enum evbuffer_eol_style eol_style);
 
+/**
+ * structure to hold parsed uri
+ */
+struct evhttp_uri {
+       char *scheme; /* scheme; e.g http, ftp etc */
+       char *host; /* hostname, or NULL */
+       char *user; /* usename, or NULL */
+       char *pass; /* password, or NULL */
+       int port; /* port, or zero */
+       char *query; /* path + query: e.g. /path/to?param=foo, or NULL */
+       char *fragment; /* fragment or NULL */
+};
+
+/**
+   Helper function to parse out uri.
+
+   Parsing a uri like
+
+      scheme://[user[:pass]@]foo.com[:port]/[path][?q=test&s=some+thing][#fragment]
+
+   @param source_uri the request URI
+   @param uri container to hold parsed data
+ */
+void evhttp_uri_parse(const char *source_uri, struct evhttp_uri *uri);
+
+/**
+ * Free the memory allocated for the parsed data, except uri itself
+ * @param uri container with parsed data
+ */
+void evhttp_uri_clear(struct evhttp_uri *uri);
+
+/**
+ * Join together the uri parts from parsed data
+ * @param uri container with parsed data
+ * @param buf destination buffer
+ * @param limit destination buffer size
+ * @return an joined uri as string or NULL on error
+ */
+char *evhttp_uri_join(struct evhttp_uri *uri, void *buf, size_t limit);
+
+
 #endif

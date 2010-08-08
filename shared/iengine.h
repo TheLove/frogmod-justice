@@ -345,6 +345,7 @@ extern void sendpacket(int cn, int chan, ENetPacket *packet, int exclude = -1);
 extern void flushserver(bool force);
 extern int getnumclients();
 extern uint getclientip(int n);
+extern const char * getclienthostname(int n);
 extern void putint(ucharbuf &p, int n);
 extern void putint(packetbuf &p, int n);
 extern void putint(vector<uchar> &p, int n);

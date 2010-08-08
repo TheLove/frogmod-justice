@@ -146,3 +146,147 @@ char *evbuffer_readln_nul(struct evbuffer *buffer, size_t *n_read_out, enum evbu
 	return result;
 }
 
+#include "log-internal.h"
+#include "mm-internal.h"
+
+// Pavel Plesov's patch for libevent, not included in release yet
+void evhttp_uri_parse(const char *source_uri, struct evhttp_uri *uri)
+{
+       evhttp_uri_clear(uri);
+
+       char *readbuf = mm_strdup(source_uri);
+       if (readbuf == NULL) {
+               fprintf(stderr, "%s: strdup", __func__);
+               return;
+       }
+
+       char *readp = readbuf, *token = NULL;
+
+       /* 1. scheme:// */
+       token = strstr(readp, "://");
+       if (!token) {
+               /* unsupported uri */
+               printf("unsupported uri\n");
+               mm_free(readbuf);
+               return;
+       }
+
+       *token = '\0';
+       uri->scheme = mm_strdup(readp);
+
+       readp = token;
+       readp += 3; /* :// */
+
+       /* 2. query */
+       char *query = strchr(readp, '/');
+       if (query) {
+               char *fragment = strchr(query, '#');
+               if (fragment) {
+                       *fragment++ = '\0'; /* eat '#' */
+                       uri->fragment = mm_strdup(fragment);
+               }
+
+               uri->query = mm_strdup(query);
+               *query = '\0'; /* eat '/' */
+       }
+
+       /* 3. user:pass@host:port */
+       char *host = strchr(readp, '@');
+       if (host) {
+               /* got user:pass@host:port */
+               *host++ = '\0'; /* eat @ */;
+               char *pass = strchr(readp, ':');
+               if (pass) {
+                       *pass++ = '\0'; /* eat ':' */
+                       uri->pass = mm_strdup(pass);
+               }
+
+               uri->user = mm_strdup(readp);
+
+               readp = host;
+       }
+       /* got host:port */
+
+       char *port = strchr(readp, ':');
+       if (port) {
+               *port++ = '\0'; /* eat ':' */
+               uri->port = atoi(port);
+       }
+
+       uri->host = mm_strdup(readp);
+}
+
+void evhttp_uri_clear(struct evhttp_uri *uri)
+{
+#define _URI_CLEAR_STR(f)              \
+       if (uri->f) {                   \
+               mm_free(uri->f);        \
+               uri->f = NULL;          \
+       }
+
+       _URI_CLEAR_STR(scheme);
+       _URI_CLEAR_STR(user);
+       _URI_CLEAR_STR(pass);
+       _URI_CLEAR_STR(host);
+       uri->port = 0;
+       _URI_CLEAR_STR(query);
+       _URI_CLEAR_STR(fragment);
+
+#undef _URI_CLEAR_STR
+}
+
+char *evhttp_uri_join(struct evhttp_uri *uri, void *buf, size_t limit)
+{
+#define _URI_ADD(f)    evbuffer_add(tmp, uri->f, strlen(uri->f))
+       if (!uri || !uri->scheme || !buf || !limit)
+               return NULL;
+
+       struct evbuffer *tmp = evbuffer_new();
+       if (!tmp)
+               return NULL;
+
+       _URI_ADD(scheme);
+       evbuffer_add(tmp, "://", 3);
+       if (uri->host && *uri->host) {
+               if (uri->user && *uri->user) {
+                       _URI_ADD(user);
+                       if (uri->pass && *uri->pass) {
+                               evbuffer_add(tmp, ":", 1);
+                               _URI_ADD(pass);
+                       }
+                       evbuffer_add(tmp, "@", 1);
+               }
+
+               _URI_ADD(host);
+
+               if (uri->port > 0)
+                       evbuffer_add_printf(tmp,":%u", uri->port);
+       }
+
+       if (uri->query && *uri->query)
+               _URI_ADD(query);
+
+       if (uri->fragment && *uri->fragment) {
+               if (!uri->query || !*uri->query)
+                       evbuffer_add(tmp, "/", 1);
+
+               evbuffer_add(tmp, "#", 1);
+               _URI_ADD(fragment);
+       }
+
+       evbuffer_add(tmp, "\0", 1); /* NUL */
+
+       unsigned char *joined = evbuffer_pullup(tmp, -1);
+       size_t joined_size = evbuffer_get_length(tmp);
+
+       if (joined_size < limit)
+               memcpy(buf, joined, joined_size);
+       else {
+               memcpy(buf, joined, limit-1);
+               *((char *)buf+ limit - 1) = '\0';
+       }
+       evbuffer_free(tmp);
+
+       return (char *)buf;
+#undef _URI_ADD
+}

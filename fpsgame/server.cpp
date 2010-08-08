@@ -679,7 +679,7 @@ namespace server
 			struct evkeyvalq *o = evhttp_request_get_output_headers(req);
 			evhttp_add_header(o, "WWW-Authenticate", "Basic realm=\"Secure Area\"");
 			evbuffer *buf = evbuffer_new();
-			evbuffer_add_printf(buf, "<h1>Authorization required</h1>");
+			evbuffer_add_printf(buf, "<h1>Authorization Required</h1>");
 			evhttp_send_reply(req, 401, "Authorization Required", buf);
 			evbuffer_free(buf);
 		}
@@ -705,6 +705,47 @@ namespace server
 		evhttp_set_gencb(http, httpgencb, NULL);
 	}
 
+	static void http_event_cb(struct evhttp_request *req, void *arg) {
+		char *line;
+		evbuffer *buf = evhttp_request_get_input_buffer(req);
+		while((line = evbuffer_readln_nul(buf, NULL, EVBUFFER_EOL_ANY))) {
+			printf("HTTP: %s\n", line);
+			free(line);
+		}
+	}
+
+	SVAR(httphook, "");
+	void http_post_event(const char *first, ...) {
+		va_list ap;
+		if(httphook[0]) {
+			evhttp_uri uri;
+			memset(&uri, 0, sizeof(uri));
+			evhttp_uri_parse(httphook, &uri);
+			if(!uri.host) return;
+			evhttp_connection *con = evhttp_connection_base_new(evbase, dnsbase, uri.host, uri.port?uri.port:80);
+			if(con) {
+				if(serverip[0]) evhttp_connection_set_local_address(con, serverip);
+				evhttp_request *req = evhttp_request_new(http_event_cb, NULL);
+				evbuffer *buf = evhttp_request_get_output_buffer(req);
+				evbuffer_add_printf(buf, "{\n");
+				evbuffer_add_json_prop(buf, "serverdesc", serverdesc);
+				evbuffer_add_json_prop(buf, "serverport", getvar("serverport"));
+				evbuffer_add_json_prop(buf, "totalmillis", totalmillis);
+				const char *name = first, *value;
+				va_start(ap, first);
+				while(name) {
+					value = va_arg(ap, const char *);
+					const char *nname = va_arg(ap, const char *);
+					evbuffer_add_json_prop(buf, name, value, nname!=NULL);
+					name = nname;
+				}
+				evbuffer_add_printf(buf, "}");
+				evhttp_add_header(evhttp_request_get_output_headers(req), "Host", uri.host);
+				evhttp_make_request(con, req, EVHTTP_REQ_POST, uri.query);
+			}
+			evhttp_uri_clear(&uri);
+		}
+	}
 
 	void ircmsgcb(IRC::Source *source, char *msg) {
 		string buf;
@@ -2155,6 +2196,8 @@ namespace server
             ci->state.timeplayed += lastmillis - ci->state.lasttimeplayed;
             savescore(ci);
             outf(2 | OUT_NOGAME, "%s left", ci->name);
+            defformatstring(mil)("%d", totalmillis - ci->connectmillis);
+            http_post_event("action", "disconnect", "name", ci->name, "ip", getclienthostname(ci->clientnum), "millis", mil, NULL);
             sendf(-1, 1, "ri2", N_CDIS, n);
             clients.removeobj(ci);
             aiman::removeai(ci);
@@ -2424,6 +2467,7 @@ namespace server
                 if(servermotd[0]) sendf(sender, 1, "ris", N_SERVMSG, servermotd);
 
                 outf(2 | OUT_NOGAME, "%s connected\n", ci->name);
+                http_post_event("action", "connect", "name", ci->name, "ip", getclienthostname(ci->clientnum), NULL);
             }
         }
         else if(chan==2)
@@ -2512,7 +2556,7 @@ namespace server
                 }
                 break;
             }
-                
+
             case N_FROMAI:
             {
                 int qcn = getint(p);
@@ -2715,6 +2759,7 @@ namespace server
                 filtertext(newname, text, false, MAXNAMELEN);
                 if(!newname[0]) copystring(ci->name, "unnamed");
                 outf(2 | OUT_NOGAME, "%s is now known as %s\n", ci->name, newname);
+                http_post_event("action", "switchname", "name", ci->name, "ip", getclienthostname(ci->clientnum), "newname", newname, NULL);
                 copystring(ci->name, newname);
                 QUEUE_STR(ci->name);
                 break;

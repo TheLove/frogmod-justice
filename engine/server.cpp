@@ -323,6 +323,7 @@ void *getclientinfo(int i) { return !clients.inrange(i) || clients[i]->type==ST_
 ENetPeer *getclientpeer(int i) { return clients.inrange(i) && clients[i]->type==ST_TCPIP ? clients[i]->peer : NULL; }
 int getnumclients()        { return clients.length(); }
 uint getclientip(int n)    { return clients.inrange(n) && clients[n]->type==ST_TCPIP ? clients[n]->peer->address.host : 0; }
+const char *getclienthostname(int n) { return clients.inrange(n) && clients[n]->type==ST_TCPIP ? clients[n]->hostname : 0; }
 
 void sendpacket(int n, int chan, ENetPacket *packet, int exclude)
 {
