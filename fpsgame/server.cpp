@@ -707,6 +707,7 @@ namespace server
 	}
 
 	static void http_event_cb(struct evhttp_request *req, void *arg) {
+		printf("http_event_cb\n");
 		char *line;
 		evbuffer *buf = evhttp_request_get_input_buffer(req);
 		while((line = evbuffer_readln_nul(buf, NULL, EVBUFFER_EOL_ANY))) {
@@ -719,11 +720,9 @@ namespace server
 	void http_post_event(const char *first, ...) {
 		va_list ap;
 		if(httphook[0]) {
-			evhttp_uri uri;
-			memset(&uri, 0, sizeof(uri));
-			evhttp_uri_parse(httphook, &uri);
-			if(!uri.host) return;
-			evhttp_connection *con = evhttp_connection_base_new(evbase, dnsbase, uri.host, uri.port?uri.port:80);
+			evhttp_uri *uri = evhttp_uri_parse(httphook);;
+			if(!uri) return;
+			evhttp_connection *con = evhttp_connection_base_new(evbase, dnsbase, uri->host, uri->port?uri->port:80);
 			if(con) {
 				if(serverip[0]) evhttp_connection_set_local_address(con, serverip);
 				evhttp_request *req = evhttp_request_new(http_event_cb, NULL);
@@ -741,10 +740,10 @@ namespace server
 					name = nname;
 				}
 				evbuffer_add_printf(buf, "}");
-				evhttp_add_header(evhttp_request_get_output_headers(req), "Host", uri.host);
-				evhttp_make_request(con, req, EVHTTP_REQ_POST, uri.query);
+				evhttp_add_header(evhttp_request_get_output_headers(req), "Host", uri->host);
+				evhttp_make_request(con, req, EVHTTP_REQ_POST, uri->query);
 			}
-			evhttp_uri_clear(&uri);
+			evhttp_uri_free(uri);
 		}
 	}
 
