@@ -12,6 +12,7 @@ static event update_event;
 static event netstats_event;
 //static event stdin_event;
 IRC::Client irc;
+evbuffer *httpoutbuf = NULL;
 
 #ifdef STANDALONE
 // thanks to Catelite for making this list
@@ -120,16 +121,22 @@ void fatal(const char *s, ...)
 
 void voutf(int v, const char *fmt, va_list args)
 {
-    string sf, sp;
-    vformatstring(sf, fmt, args);
+	string sf, sp;
+	vformatstring(sf, fmt, args);
 
 	color_sauer2console(sf, sp);
-	if(!(v & OUT_NOCONSOLE)) puts(sp);
-    if(irc.base && !(v & OUT_NOIRC)) {
-    	color_sauer2irc(sf, sp);
-    	irc.speak(v & 0xff, "%s", sp);
-    }
-    if(!(v & OUT_NOGAME)) server::sendservmsg(sf);
+	if(!(v & OUT_NOCONSOLE)) {
+		puts(sp);
+		if(httpoutbuf) {
+			evbuffer_add_vprintf(httpoutbuf, fmt, args);
+			evbuffer_add_printf(httpoutbuf, "\n");
+		}
+	}
+	if(irc.base && !(v & OUT_NOIRC)) {
+		color_sauer2irc(sf, sp);
+		irc.speak(v & 0xff, "%s", sp);
+	}
+	if(!(v & OUT_NOGAME)) server::sendservmsg(sf);
 }
 
 void outf(const char *fmt, ...)

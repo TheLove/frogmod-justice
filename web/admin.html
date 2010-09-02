@@ -7,7 +7,7 @@
 <script type="text/javascript" src="/frogmod.js"></script>
 </head>
 <body onload="admin = true; init()">
-<div id="links"><a href="/admin">admin</a> | <a href="/">index</a></div>
+<div id="links"><a class="current" href="/admin">admin</a> | <a href="/">index</a></div>
 <h1 id="title">Frogmod admin console</h1>
 <h2>Info:</h2>
 <div id="info">
@@ -16,6 +16,51 @@ Loading...
 <h2>Status:</h2>
 <div id="status">
 Loading...
+</div>
+<h2>Commands:</h2>
+<div id="result" style="display: none"></div>
+<div id="commands">
+<ul>
+	<li><a href="?command=clearbans" onclick="return execute(&quot;clearbans&quot;)">Clear bans</a></li>
+	<li><a href="?command=takemaster" onclick="return execute(&quot;takemaster&quot;)">Take master</a></li>
+	<li>Mastermode: <select onchange="execute(&quot;mastermode &quot;+this.value)">
+		<option value="-1">auth</option>
+		<option value="0">open</option>
+		<option value="1">veto</option>
+		<option value="2">locked</option>
+		<option value="3">private</option>
+		<option value="4">password</option>
+	</select></li>
+	<li>Game mode: <select onchange="execute(&quot;mode &quot;+this.value)">
+		<option value="-3">SP</option>
+		<option value="-2">DMSP</option>
+		<option value="-1">demo</option>
+		<option value="0">ffa</option>
+		<option value="1">coop edit</option>
+		<option value="2">teamplay</option>
+		<option value="3">instagib</option>
+		<option value="4">instagib team</option>
+		<option value="5">efficiency</option>
+		<option value="6">efficiency team</option>
+		<option value="7">tactics</option>
+		<option value="8">tactics team</option>
+		<option value="9">capture</option>
+		<option value="10">regen capture</option>
+		<option value="11">ctf</option>
+		<option value="12">insta ctf</option>
+		<option value="13">protect</option>
+		<option value="14">insta protect</option>
+		<option value="15">hold</option>
+		<option value="16">insta hold</option>
+		<option value="17">efficiency ctf</option>
+		<option value="18">efficiency protect</option>
+		<option value="19">efficiency hold</option>
+	</select></li>
+	<li><form action="" method="GET" onsubmit="var elm = document.getElementById('commandtext').value; execute(elm); return false;">
+		<input type="text" id="commandtext" name="command" size="30">
+		<input type="submit" value="Run">
+	</form></li>
+</ul>
 </div>
 <h2>Players:</h2>
 <div id="players">
@@ -27,7 +72,7 @@ Loading...
 </div>
 <div class="right small">
 <a target="_blank" href="http://wiki.github.com/vampirefrog/frogmod-justice/help">Help</a> |
-<a target="_blank" href="http://github.com/vampirefrog/frogmod-justice/issues">Report a bug</a> |
+<a target="_blank" href="http://github.com/vampirefrog/frogmod-justice/issues">Report a bug</a>
 </div>
 <div class="clear"></div>
 </div>

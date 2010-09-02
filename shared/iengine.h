@@ -374,6 +374,7 @@ extern bool requestmasterf(const char *fmt, ...);
 
 extern event_base *evbase;
 extern evdns_base *dnsbase;
+extern evbuffer *httpoutbuf;
 
 // client
 extern void sendclientpacket(ENetPacket *packet, int chan);

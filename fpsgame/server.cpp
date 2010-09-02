@@ -529,6 +529,7 @@ namespace server
 	}
 
 	void evbuffer_add_json_string(evbuffer *buf, const char *str) {
+		if(!str) return;
 		const char *c = str;
 		while(*c) {
 			switch(*c) {
@@ -608,6 +609,7 @@ namespace server
 			if(!ci) continue;
 			evbuffer_add_printf(buf, "\t{\n");
 			evbuffer_add_json_prop(buf, "name", ci->name);
+			evbuffer_add_json_prop(buf, "hostname", getclienthostname(i));
 			evbuffer_add_json_prop(buf, "team", ci->team);
 			evbuffer_add_json_prop(buf, "clientnum", ci->clientnum);
 			evbuffer_add_json_prop(buf, "privilege", ci->privilege);
@@ -650,31 +652,12 @@ namespace server
 			evhttp_parse_query(evhttp_request_get_uri(req), &query);
 			// kick
 			const char *val;
-			if((val = evhttp_find_header(&query, "kick"))) {
-				int cn = atoi(val);
-				kick_client(cn);
-				evhttp_request_redirect(req, "/admin");
-			} else if((val = evhttp_find_header(&query, "spec"))) {
-				int cn = atoi(val);
-				spectator(cn, 1);
-				evhttp_request_redirect(req, "/admin");
-			} else if((val = evhttp_find_header(&query, "unspec"))) {
-				int cn = atoi(val);
-				spectator(cn, 0);
-				evhttp_request_redirect(req, "/admin");
-			} else if((val = evhttp_find_header(&query, "givemaster"))) {
-				int cn = atoi(val);
-				clientinfo *ci = (clientinfo *)getclientinfo(cn);
-				if(ci) {
-					clientinfo *cm = (clientinfo *)getclientinfo(currentmaster);
-					if(cm) setmaster(cm, 0);
-					setmaster(ci, 1);
-				}
-				evhttp_request_redirect(req, "/admin");
-			} else if((evhttp_find_header(&query, "takemaster"))) {
-				clientinfo *cm = (clientinfo *)getclientinfo(currentmaster);
-				if(cm) setmaster(cm, 0);
-				evhttp_request_redirect(req, "/admin");
+			if((val = evhttp_find_header(&query, "command"))) {
+				httpoutbuf = evbuffer_new();
+				execute(val);
+				evhttp_send_reply(req, 200, "OK", httpoutbuf);
+				evbuffer_free(httpoutbuf);
+				httpoutbuf = NULL;
 			} else evhttp_serve_file(req, "admin.html");
 		} else {
 			struct evkeyvalq *o = evhttp_request_get_output_headers(req);
@@ -707,7 +690,6 @@ namespace server
 	}
 
 	static void http_event_cb(struct evhttp_request *req, void *arg) {
-		printf("http_event_cb\n");
 		char *line;
 		evbuffer *buf = evhttp_request_get_input_buffer(req);
 		while((line = evbuffer_readln_nul(buf, NULL, EVBUFFER_EOL_ANY))) {
@@ -1786,6 +1768,12 @@ namespace server
         sendf(-1, 1, "risii", N_MAPCHANGE, map, mode, 1);
         changemap(map, mode);
     }
+    ICOMMAND(map, "si", (char *s, int *m), {
+    	if(s) forcemap(s, m?*m:gamemode);
+    });
+    ICOMMAND(mode, "i", (int *m), {
+    	if(m) forcemap(smapname, *m);
+    });
 
     void vote(char *map, int reqmode, int sender)
     {
@@ -2149,9 +2137,10 @@ namespace server
         sendf(ci->clientnum, 1, "ri5s", N_SERVINFO, ci->clientnum, PROTOCOL_VERSION, ci->sessionid, serverpass[0] ? 1 : 0, serverdesc);
     }
 
+	void clearbans();
     void noclients()
     {
-        bannedips.shrink(0);
+        clearbans();
         aiman::clearai();
     }
 
@@ -2377,20 +2366,37 @@ namespace server
         }
     }
 
-    void kick_client(int victim, clientinfo *m) {
-    	clientinfo *ci = (clientinfo *)getclientinfo(victim);
-        if(ci) { // no bots
-            ban &b = bannedips.add();
-            b.time = totalmillis;
-            b.ip = getclientip(victim);
-            allowedips.removeobj(b.ip);
-            defformatstring(mil)("%d", totalmillis - ci->connectmillis);
-            http_post_event("action", "kick", "name", ci->name, "ip", getclienthostname(victim), "millis", mil, "kicker", m?m->name:"", "kicker_ip", m?getclienthostname(m->clientnum):"", NULL);
-            disconnect_client(victim, DISC_KICK);
-        }
-    }
+	ICOMMAND(givemaster, "i", (int *cn), {
+		if(cn) {
+			clientinfo *ci = (clientinfo *)getclientinfo(*cn);
+			if(ci) {
+				clientinfo *cm = (clientinfo *)getclientinfo(currentmaster);
+				if(cm) setmaster(cm, 0);
+				setmaster(ci, 1);
+			}
+		}
+	});
 
-	void spectator(int spectator, int val) {
+	ICOMMAND(takemaster, "", (), {
+		clientinfo *cm = (clientinfo *)getclientinfo(currentmaster);
+		if(cm) setmaster(cm, 0);
+	});
+
+	void kick_client(int victim, clientinfo *m) {
+		clientinfo *ci = (clientinfo *)getclientinfo(victim);
+		if(ci) { // no bots
+			ban &b = bannedips.add();
+			b.time = totalmillis;
+			b.ip = getclientip(victim);
+			allowedips.removeobj(b.ip);
+			defformatstring(mil)("%d", totalmillis - ci->connectmillis);
+			http_post_event("action", "kick", "name", ci->name, "ip", getclienthostname(victim), "millis", mil, "kicker", m?m->name:"", "kicker_ip", m?getclienthostname(m->clientnum):"", NULL);
+			disconnect_client(victim, DISC_KICK);
+		}
+	}
+	ICOMMAND(kick, "i", (int *cn), { if(cn) kick_client(*cn); });
+
+	void spectator(int val, int spectator) {
         clientinfo *spinfo = (clientinfo *)getclientinfo(spectator); // no bots
         if(!spinfo || (spinfo->state.state==CS_SPECTATOR ? val : !val)) return;
 
@@ -2400,7 +2406,7 @@ namespace server
             spinfo->state.state = CS_SPECTATOR;
             spinfo->state.timeplayed += lastmillis - spinfo->state.lasttimeplayed;
             if(!spinfo->local && !spinfo->privilege) aiman::removeai(spinfo);
-            outf(2, "\f7%s is now a spectator", colorname(spinfo));
+            outf(2, "\f1%s is now a spectator", colorname(spinfo));
         } else if(spinfo->state.state==CS_SPECTATOR && !val) {
             spinfo->state.state = CS_DEAD;
             spinfo->state.respawn();
@@ -2408,11 +2414,29 @@ namespace server
             aiman::addclient(spinfo);
             if(spinfo->clientmap[0] || spinfo->mapcrc) checkmaps();
             sendf(-1, 1, "ri", N_MAPRELOAD);
-            outf(2, "\f7%s is no longer a spectator", colorname(spinfo));
+            outf(2, "\f1%s is no longer a spectator", colorname(spinfo));
         }
         sendf(-1, 1, "ri3", N_SPECTATOR, spectator, val);
         if(!val && mapreload && !spinfo->privilege && !spinfo->local) sendf(spectator, 1, "ri", N_MAPRELOAD);
 	}
+	ICOMMAND(spectator, "ii", (int *v, int *s), { if(s && v) spectator(*v, *s); });
+
+	void clearbans() {
+		bannedips.shrink(0);
+		outf(2, "All bans cleared.");
+	}
+	COMMAND(clearbans, "");
+
+	void setmastermode(int mm) {
+		mastermode = mm;
+		outf(2 | OUT_NOGAME, "\f4Mastermode is now \f5%s\f4 (%d)", mastermodename(mastermode), mastermode);
+		allowedips.shrink(0);
+		if(mm>=MM_PRIVATE) {
+			loopv(clients) allowedips.add(getclientip(clients[i]->clientnum));
+		}
+		sendf(-1, 1, "rii", N_MASTERMODE, mastermode);
+	}
+	ICOMMAND(mastermode, "i", (int *m), { if(m) setmastermode(*m); });
 
 	bool processtext(clientinfo *ci, char *text) {
 		outf(1 | OUT_NOGAME, "\f1<%s> \f0%s", ci->name, text);
@@ -2879,14 +2903,7 @@ namespace server
                 {
                     if((ci->privilege>=PRIV_ADMIN || ci->local) || (mastermask&(1<<mm)))
                     {
-                        mastermode = mm;
-                    	outf(2 | OUT_NOGAME, "\f4Mastermode is now \f5%s\f4 (%d)", mastermodename(mastermode), mastermode);
-                        allowedips.shrink(0);
-                        if(mm>=MM_PRIVATE)
-                        {
-                            loopv(clients) allowedips.add(getclientip(clients[i]->clientnum));
-                        }
-                        sendf(-1, 1, "rii", N_MASTERMODE, mastermode);
+                    	setmastermode(mm);
                     }
                     else
                     {
@@ -2901,8 +2918,7 @@ namespace server
             {
                 if(ci->privilege || ci->local)
                 {
-                    bannedips.shrink(0);
-                    outf(2, "All bans cleared.");
+                	clearbans();
                 }
                 break;
             }
@@ -2918,7 +2934,7 @@ namespace server
             {
                 int spec = getint(p), val = getint(p);
                 if(!ci->privilege && !ci->local && (spec!=sender || (ci->state.state==CS_SPECTATOR && mastermode>=MM_LOCKED))) break;
-                spectator(spec, val);
+                spectator(val, spec);
                 break;
             }
 
