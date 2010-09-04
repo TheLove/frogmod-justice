@@ -179,7 +179,7 @@ function update_players_cb(xhr) {
 				if(players && players.length > 0) {
 					var html = new Array();
 					html.push('<table><tr><th>Cn</th><th>Name</th>');
-					if(admin) html.push('<th>IP</th>');
+					if(admin) html.push('<th>IP</th>'); else html.push('<th>Country</th>');
 					html.push('<th>Team</th><th>Status</th>');
 					html.push('<th>Ping</th><th>Frags</th><th>Deaths</th><th>Teamkills</th><th>Shotdamage</th>');
 					html.push('<th>Damage</th><th>Effectiveness</th>');
@@ -188,8 +188,10 @@ function update_players_cb(xhr) {
 						html.push('<tr'+(players[p].state == 5 ? ' class="spec"': (players[p].state == 1 ? ' class="dead"' :''))+'>');
 						html.push('<td>'+players[p].clientnum+'</td>');
 						html.push('<td class="privilege'+players[p].privilege+'">' + player_icon(players[p].playermodel) + ' ' + escapeHtml(players[p].name) + '</td>');
-						if(admin) html.push('<td>'+players[p].hostname);
-						if(players[p].country) html.push(' ('+players[p].country+')');
+						html.push('<td>');
+						if(admin) html.push(players[p].hostname + ' (');
+						if(players[p].country) html.push(players[p].country);
+						if(admin) html.push(')');
 						html.push('</td>');
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
