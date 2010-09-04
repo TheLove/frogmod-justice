@@ -180,6 +180,14 @@ void conoutf(int type, const char *fmt, ...)
     conoutfv(type, fmt, args);
     va_end(args);
 }
+
+ICOMMAND(echo, "C", (char *s), {
+	if(httpoutbuf) evbuffer_add_printf(httpoutbuf, "%s", s);
+});
+ICOMMAND(say, "C", (char *s), {
+	outf(0, "\f4[ADMIN] \f7%s", s);
+});
+
 #endif
 
 // all network traffic is in 32bit ints, which are then compressed using the following simple scheme (assumes that most values are small).
