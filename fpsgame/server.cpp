@@ -610,6 +610,9 @@ namespace server
 			evbuffer_add_printf(buf, "\t{\n");
 			evbuffer_add_json_prop(buf, "name", ci->name);
 			evbuffer_add_json_prop(buf, "hostname", getclienthostname(i));
+#ifdef HAVE_GEOIP
+			evbuffer_add_json_prop(buf, "country", getclientcountrynul(i));
+#endif
 			evbuffer_add_json_prop(buf, "team", ci->team);
 			evbuffer_add_json_prop(buf, "clientnum", ci->clientnum);
 			evbuffer_add_json_prop(buf, "privilege", ci->privilege);
@@ -2493,7 +2496,15 @@ namespace server
 
                 if(servermotd[0]) sendf(sender, 1, "ris", N_SERVMSG, servermotd);
 
+#ifdef HAVE_GEOIP
+				const char *country = getclientcountry(ci->clientnum);
+				if(country) {
+					outf(2 | OUT_NOGAME, "%s connected from %s\n", ci->name, country);
+					outf(2 | OUT_NOIRC | OUT_NOCONSOLE, "%s is connected from %s\n", ci->name, country);
+				} else // fall through
+#endif
                 outf(2 | OUT_NOGAME, "%s connected\n", ci->name);
+
                 http_post_event("action", "connect", "name", ci->name, "ip", getclienthostname(ci->clientnum), NULL);
             }
         }

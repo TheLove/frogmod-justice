@@ -13,6 +13,10 @@ static event netstats_event;
 //static event stdin_event;
 IRC::Client irc;
 evbuffer *httpoutbuf = NULL;
+#ifdef HAVE_GEOIP
+#include <GeoIP.h>
+GeoIP *geoip;
+#endif
 
 #ifdef STANDALONE
 // thanks to Catelite for making this list
@@ -304,6 +308,9 @@ struct client                   // server side version of "dynent" type
     int num;
     ENetPeer *peer;
     string hostname;
+#ifdef HAVE_GEOIP
+    string country;
+#endif
     void *info;
 };
 
@@ -331,6 +338,14 @@ ENetPeer *getclientpeer(int i) { return clients.inrange(i) && clients[i]->type==
 int getnumclients()        { return clients.length(); }
 uint getclientip(int n)    { return clients.inrange(n) && clients[n]->type==ST_TCPIP ? clients[n]->peer->address.host : 0; }
 const char *getclienthostname(int n) { return clients.inrange(n) && clients[n]->type==ST_TCPIP ? clients[n]->hostname : 0; }
+#ifdef HAVE_GEOIP
+const char *getclientcountrynul(int n) {
+	return clients.inrange(n) && clients[n]->type == ST_TCPIP ? (clients[n]->country[0] ? clients[n]->country : 0) : 0;
+}
+const char *getclientcountry(int n) {
+	return clients.inrange(n) && clients[n]->type == ST_TCPIP ? (clients[n]->country[0] ? clients[n]->country : "Unknown") : 0;
+}
+#endif
 
 void sendpacket(int n, int chan, ENetPacket *packet, int exclude)
 {
@@ -727,7 +742,14 @@ void serverhost_process_event(ENetEvent & event) {
             c.peer->data = &c;
             char hn[1024];
             copystring(c.hostname, (enet_address_get_host_ip(&c.peer->address, hn, sizeof(hn))==0) ? hn : "unknown");
+#ifdef HAVE_GEOIP
+			const char *country = GeoIP_country_name_by_ipnum(geoip, endianswap32(c.peer->address.host));
+			if(country) copystring(c.country, country);
+			else c.country[0] = 0;
+			printf("client connected (%s/%s)\n", c.hostname, c.country);
+#else
             printf("client connected (%s)\n", c.hostname);
+#endif
             int reason = server::clientconnect(c.num, c.peer->address.host);
             if(!reason) nonlocalclients++;
             else disconnect_client(c.num, reason);
@@ -970,6 +992,9 @@ ICOMMAND(ircecho, "C", (const char *msg), {
 
 void initserver(bool listen, bool dedicated)
 {
+#ifdef HAVE_GEOIP
+	geoip = GeoIP_new(GEOIP_STANDARD);
+#endif
 	evinit();
 	ircinit();
 

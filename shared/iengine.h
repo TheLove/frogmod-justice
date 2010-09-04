@@ -346,6 +346,10 @@ extern void flushserver(bool force);
 extern int getnumclients();
 extern uint getclientip(int n);
 extern const char * getclienthostname(int n);
+#ifdef HAVE_GEOIP
+extern const char *getclientcountrynul(int n); // returns "" if country is not found
+extern const char *getclientcountry(int n); // returns Unknown if country is not found
+#endif
 extern void putint(ucharbuf &p, int n);
 extern void putint(packetbuf &p, int n);
 extern void putint(vector<uchar> &p, int n);

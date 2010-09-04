@@ -186,7 +186,9 @@ function update_players_cb(xhr) {
 						html.push('<tr'+(players[p].state == 5 ? ' class="spec"': (players[p].state == 1 ? ' class="dead"' :''))+'>');
 						html.push('<td>'+players[p].clientnum+'</td>');
 						html.push('<td class="privilege'+players[p].privilege+'">' + player_icon(players[p].playermodel) + ' ' + escapeHtml(players[p].name) + '</td>');
-						if(admin) html.push('<td>'+players[p].hostname+'</td>');
+						if(admin) html.push('<td>'+players[p].hostname);
+						if(players[p].country) html.push('('+players[p].country+')');
+						html.push('</td>');
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
 						html.push('<td>'+players[p].ping+'</td>');
