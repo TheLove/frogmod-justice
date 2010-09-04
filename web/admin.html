@@ -18,12 +18,12 @@ Loading...
 Loading...
 </div>
 <h2>Commands:</h2>
-<div id="result" style="display: none"></div>
+<table id="commandstable"><tr><td valign="top">
 <div id="commands">
 <ul>
 	<li><a href="?command=clearbans" onclick="return execute(&quot;clearbans&quot;)">Clear bans</a></li>
 	<li><a href="?command=takemaster" onclick="return execute(&quot;takemaster&quot;)">Take master</a></li>
-	<li>Mastermode: <select onchange="execute(&quot;mastermode &quot;+this.value)">
+	<li>Mastermode: <select onchange="execute(&quot;mastermode &quot;+this.value)" id="mastermodeselect">
 		<option value="-1">auth</option>
 		<option value="0">open</option>
 		<option value="1">veto</option>
@@ -31,7 +31,7 @@ Loading...
 		<option value="3">private</option>
 		<option value="4">password</option>
 	</select></li>
-	<li>Game mode: <select onchange="execute(&quot;mode &quot;+this.value)">
+	<li>Game mode: <select onchange="execute(&quot;mode &quot;+this.value)" id="modeselect">
 		<option value="-3">SP</option>
 		<option value="-2">DMSP</option>
 		<option value="-1">demo</option>
@@ -56,12 +56,21 @@ Loading...
 		<option value="18">efficiency protect</option>
 		<option value="19">efficiency hold</option>
 	</select></li>
-	<li><form action="" method="GET" onsubmit="var elm = document.getElementById('commandtext').value; execute(elm); return false;">
+	<li><form action="" method="GET" onsubmit="var elm = document.getElementById('commandtext').value; execute(elm); document.getElementById('commandtext').value=''; return false;">
 		<input type="text" id="commandtext" name="command" size="30">
 		<input type="submit" value="Run">
+		<a href="http://wiki.github.com/vampirefrog/frogmod-justice/commands" target="_blank">command list</a>
+	</form></li>
+	<li><form action="" method="GET" onsubmit="var elm = document.getElementById('saytext').value; execute('say '+elm); document.getElementById('saytext').value = ''; return false;">
+		<input type="text" id="saytext" name="command" size="30">
+		<input type="submit" value="Say">
 	</form></li>
 </ul>
 </div>
+</td><td>
+<div id="result" style="display: none"></div>
+</td></tr>
+</table>
 <h2>Players:</h2>
 <div id="players">
 Loading...

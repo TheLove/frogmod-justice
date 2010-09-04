@@ -54,6 +54,14 @@ th {
 	padding: 8px;
 	margin: 8px;
 }
+#commandstable {
+	border: 0;
+	width: 100%;
+}
+#commandstable td {
+	border: 0;
+	vertical-align: top;
+}
 
 .privilege0 {
 }

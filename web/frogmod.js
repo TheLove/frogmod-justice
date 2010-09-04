@@ -154,6 +154,8 @@ function update_status() {
 						html.push('<li>Map: '+(st.map?'<b>'+st.map+'</b>':'<i>No map</i>')+'</li>');
 						html.push('</ul>');
 						div.innerHTML = html.join('');
+						var modeselect = document.getElementById('modeselect'); if(modeselect) modeselect.value = st.gamemode;
+						var mastermodeselect = document.getElementById('mastermodeselect'); if(mastermodeselect) mastermodeselect.value = st.mastermode;
 					} else div.innerHTML = 'No players on the server.';
 				} else div.innerHTML = 'Error ' + (this.status ? this.status : '(unreachable)');
 				status_timeout = setTimeout(update_status, status_update_millis);
@@ -187,7 +189,7 @@ function update_players_cb(xhr) {
 						html.push('<td>'+players[p].clientnum+'</td>');
 						html.push('<td class="privilege'+players[p].privilege+'">' + player_icon(players[p].playermodel) + ' ' + escapeHtml(players[p].name) + '</td>');
 						if(admin) html.push('<td>'+players[p].hostname);
-						if(players[p].country) html.push('('+players[p].country+')');
+						if(players[p].country) html.push(' ('+players[p].country+')');
 						html.push('</td>');
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
