@@ -707,6 +707,7 @@ void updatemasterserver()
     if(mastername[0] && allowupdatemaster) requestmasterf("regserv %d\n", serverport);
     lastupdatemaster = totalmillis ? totalmillis : 1;
 }
+COMMAND(updatemasterserver, "");
 
 void serverhost_process_event(ENetEvent & event) {
     switch(event.type)
