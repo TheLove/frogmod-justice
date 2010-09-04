@@ -742,11 +742,11 @@ namespace server
 	}
 
 	void ircnoticecb(IRC::Server *s, char *prefix, char *trailing) {
-		if(prefix) outf(2 | OUT_NOIRC, "\f2[%s]\f1 -%s- %s\f7", s->host, prefix, trailing);
-		else outf(2 | OUT_NOIRC, "\f2[%s]\f1 %s\f7", s->host, trailing);
+		if(prefix) outf(2 | OUT_NOIRC, "\f2[%s]\f1 -%s- %s\f7", s->alias, prefix, trailing);
+		else outf(2 | OUT_NOIRC, "\f2[%s]\f1 %s\f7", s->alias, trailing);
 	}
 	void ircpingcb(IRC::Server *s, char *prefix, char *trailing) {
-		outf(2 | OUT_NOIRC | OUT_NOGAME, "\f2[%s PING/PONG]\f1 %s\f7", s->host, trailing?trailing:"");
+		outf(2 | OUT_NOIRC | OUT_NOGAME, "\f2[%s PING/PONG]\f1 %s\f7", s->alias, trailing?trailing:"");
 	}
 	void ircjoincb(IRC::Source *s) {
 		outf(2 | OUT_NOIRC, "\f4%s \f1%s\f7 has joined", s->channel->alias, s->peer->nick);
