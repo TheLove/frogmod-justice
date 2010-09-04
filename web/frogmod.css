@@ -11,6 +11,9 @@ a {
 a:hover {
 	text-decoration: none;
 }
+a.current {
+	text-decoration: none;
+}
 h1 {
 	color: green;
 }
@@ -40,6 +43,18 @@ th {
 	text-align: left;
 	font-weight: bold;
 }
+
+.left { float: left; }
+.right { float: right; }
+.clear { clear: both; }
+
+#result {
+	background: #deffde;
+	border: 1px solid darkGreen;
+	padding: 8px;
+	margin: 8px;
+}
+
 .privilege0 {
 }
 .privilege1 {
@@ -64,10 +79,6 @@ th {
 	color: #666;
 }
 #links { float: right; }
-
-.left { float: left; }
-.right { float: right; }
-.clear { clear: both; }
 
 #footer {
 	padding-top: 2px;

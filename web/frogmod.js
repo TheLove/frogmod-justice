@@ -3,6 +3,7 @@
 var info_update_millis = 100000; // server info rarely changes
 var players_update_millis = 2000;
 var status_update_millis = 2000;
+var result_millis = 5000;
 var admin = false;
 var states = [ 'Alive', 'Dead', 'Spawning', 'Lagged', 'Editing', 'Spectator' ];
 var icons = [ 'fixit.png', 'ironsnout.png', 'ogro.png', 'inky.png', 'cannon.png' ];
@@ -15,7 +16,7 @@ function ajaxCall(uri, cb) {
 		xhr=new ActiveXObject("Microsoft.XMLHTTP");
 	}
 	xhr.onreadystatechange = cb;
-	xhr.open('GET', uri + '?' + Date(), true);
+	xhr.open('GET', uri + (uri.indexOf('?') > -1 ? '&' : '?') + Date(), true);
 	xhr.send();
 }
 
@@ -30,12 +31,30 @@ function format_time(t, show_hours) {
 	return (days > 0 ? days + 'd ': '') + (show_hours?hours+':':(parseInt(hours)>0?hours+':':'')) + minutes + ':' + seconds;
 }
 
+function escapeHtml(str) {
+	str = str.replace('<', '&lt;');
+	str = str.replace('>', '&gt;');
+
+	return str;
+}
+
+function nl2br(str) {
+	return str.replace(/\n/g, "<br />\n");
+}
+
+function autoUrls(str) {
+	if(!str) return;
+//	urls = str.match(/(ftp|http|https):\/\/(\w+:{0,1}\w*@)?([^\s<>]+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/);
+//	for(u in urls) str = str.replace(urls[u][3], '<a href="'+urls[u][3]+'">'+escapeHtml(urls[u][3])+'</a>');
+	return str;
+}
+
 //! written by quaker66:
 //! Let's convert a Cube string colorification into proper HTML spans
 //! Accepts just one argument, returns the html string.
 
 function convert_cube_string(str) {
-    var tmp = str; // some temp we'll return later
+    var tmp = escapeHtml(str); // some temp we'll return later
     var found = false; // have we found some colorz??!
     var pos = tmp.indexOf('\f'); // first occurence of \f
     while (pos != -1) { // loop till there is 0 occurs.
@@ -62,7 +81,32 @@ function convert_cube_string(str) {
     return tmp;
 }
 
+result_timeout = null;
+function set_result(str) {
+	if(result_timeout) clearTimeout(result_timeout);
+	var div = document.getElementById('result');
+	if(div) {
+		div.style.display = 'block';
+		div.innerHTML = str ? nl2br(convert_cube_string(str)) : '<i style="color: darkGreen">Empty result</i>';
+		result_timeout = setTimeout(function() { document.getElementById('result').style.display = 'none'; }, result_millis);
+	}
+}
+
+function execute(c) {
+	ajaxCall('?command='+escape(c), function() {
+		if(this.readyState == 4 && this.status == 200) {
+			set_result(this.responseText);
+		}
+	});
+	update_info();
+	update_status();
+	update_players();
+	return false;
+}
+
+var info_timeout = null;
 function update_info() {
+	if(info_timeout) { clearTimeout(info_timeout); info_timeout = null; }
 	ajaxCall('/info', function() {
 		if(this.readyState == 4) {
 			var div = document.getElementById('info');
@@ -78,8 +122,8 @@ function update_info() {
 
 						var html = new Array();
 						html.push('<ul>');
-						html.push('<li>Server name: '+convert_cube_string(st.serverdesc)+'</li>');
-						html.push('<li>Message of the day: '+convert_cube_string(st.servermotd)+'</li>');
+						html.push('<li>Server name: '+autoUrls(convert_cube_string(st.serverdesc))+'</li>');
+						html.push('<li>Message of the day: '+autoUrls(convert_cube_string(st.servermotd))+'</li>');
 						html.push('<li>Max players: '+st.maxclients+'</li>');
 						html.push('</ul>');
 						div.innerHTML = html.join('');
@@ -91,7 +135,9 @@ function update_info() {
 	});
 }
 
+status_timeout = null;
 function update_status() {
+	if(status_timeout) { clearTimeout(status_timeout); status_timeout = null; }
 	ajaxCall('/status', function() {
 		if(this.readyState == 4) {
 			var div = document.getElementById('status');
@@ -110,7 +156,7 @@ function update_status() {
 						div.innerHTML = html.join('');
 					} else div.innerHTML = 'No players on the server.';
 				} else div.innerHTML = 'Error ' + (this.status ? this.status : '(unreachable)');
-				setTimeout(update_status, status_update_millis);
+				status_timeout = setTimeout(update_status, status_update_millis);
 			}
 		}
 	});
@@ -121,6 +167,7 @@ function player_icon(model) {
 	return '<img title="'+icons[model].replace('.png', '')+'" src="'+icons[model]+'">';
 }
 
+players_timeout = null;
 function update_players_cb(xhr) {
 	if(xhr.readyState == 4) {
 		var div = document.getElementById('players');
@@ -129,14 +176,17 @@ function update_players_cb(xhr) {
 				var players = eval('(' + xhr.responseText + ')');
 				if(players && players.length > 0) {
 					var html = new Array();
-					html.push('<table><tr><th>Cn</th><th>Name</th><th>Team</th><th>Status</th>');
+					html.push('<table><tr><th>Cn</th><th>Name</th>');
+					if(admin) html.push('<th>IP</th>');
+					html.push('<th>Team</th><th>Status</th>');
 					html.push('<th>Ping</th><th>Frags</th><th>Deaths</th><th>Teamkills</th><th>Shotdamage</th>');
 					html.push('<th>Damage</th><th>Effectiveness</th>');
 					html.push('<th>Uptime</th>'+(admin?'<th>Actions</th>':'')+'</tr>');
 					for(p in players) {
 						html.push('<tr'+(players[p].state == 5 ? ' class="spec"': (players[p].state == 1 ? ' class="dead"' :''))+'>');
 						html.push('<td>'+players[p].clientnum+'</td>');
-						html.push('<td class="privilege'+players[p].privilege+'">' + player_icon(players[p].playermodel) + ' ' + players[p].name + '</td>');
+						html.push('<td class="privilege'+players[p].privilege+'">' + player_icon(players[p].playermodel) + ' ' + escapeHtml(players[p].name) + '</td>');
+						if(admin) html.push('<td>'+players[p].hostname+'</td>');
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
 						html.push('<td>'+players[p].ping+'</td>');
@@ -146,17 +196,17 @@ function update_players_cb(xhr) {
 						html.push('<td>'+players[p].shotdamage+'</td>');
 						html.push('<td>'+players[p].damage+'</td>');
 						html.push('<td>'+players[p].effectiveness+'</td>');
-						html.push('<td>'+format_time(players[p].connectmillis)+'</td>');
+						html.push('<td>'+(players[p].clientnum < 128 ? format_time(players[p].connectmillis) : '')+'</td>');
 						if(admin) {
-							html.push('<td><a href="?kick='+players[p].clientnum+'" title="Kick"><img src="kick.png" alt="[K]"></a> ');
+							html.push('<td><a href="?command=kick+'+players[p].clientnum+'" onclick="return execute(&quot;kick '+players[p].clientnum+'&quot;)" title="Kick"><img src="kick.png" alt="[K]"></a> ');
 							if(players[p].state == 5)
-								html.push('<a href="?unspec='+players[p].clientnum+'" title="Unspec"><img src="unspec.png" alt="[U]"</a> ');
+								html.push('<a href="?command=spectator+0+'+players[p].clientnum+'" onclick="return execute(&quot;spectator 0 '+players[p].clientnum+'&quot;);" title="Unspec"><img src="unspec.png" alt="[U]"</a> ');
 							else
-								html.push('<a href="?spec='+players[p].clientnum+'" title="Spec"><img src="spec.png" alt="[S]"></a> ');
+								html.push('<a href="?command=spectator+1+'+players[p].clientnum+'" onclick="return execute(&quot;spectator 1 '+players[p].clientnum+'&quot;);" title="Spec"><img src="spec.png" alt="[S]"></a> ');
 							if(players[p].privilege)
-								html.push('<a href="?takemaster=true" title="Take master"><img src="takemaster.png" alt="[T]"</a> ');
+								html.push('<a href="?command=takemaster" title="Take master" onclick="return execute(&quot;takemaster&quot;);"><img src="takemaster.png" alt="[T]"</a> ');
 							else
-								html.push('<a href="?givemaster='+players[p].clientnum+'" title="Give master"><img src="givemaster.png" alt="[M]"></a> ');
+								html.push('<a href="?command=givemaster+'+players[p].clientnum+'" onclick="return execute(&quot;givemaster '+players[p].clientnum+'&quot;);" title="Give master"><img src="givemaster.png" alt="[M]"></a> ');
 							html.push('</td>');
 						}
 						html.push('</tr>');
@@ -165,12 +215,13 @@ function update_players_cb(xhr) {
 					div.innerHTML = html.join('');
 				} else div.innerHTML = 'No players on the server.';
 			} else div.innerHTML = 'Error ' + (xhr.status ? xhr.status : '(unreachable)');
-			setTimeout(update_players, players_update_millis);
+			players_timeout = setTimeout(update_players, players_update_millis);
 		}
 	}
 }
 
 function update_players(admin) {
+	if(players_timeout) { clearTimeout(players_timeout); players_timeout = null; }
 	ajaxCall('/players', admin ? function() { update_players_cb(this, true); } : function() { update_players_cb(this, false); });
 }
 

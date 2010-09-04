@@ -146,7 +146,7 @@
 #define _EVENT_HAVE_NETINET_IN_H 1
 
 /* Define if the system has openssl */
-#define _EVENT_HAVE_OPENSSL 1
+/* #undef _EVENT_HAVE_OPENSSL */
 
 /* Define to 1 if you have the `pipe' function. */
 #define _EVENT_HAVE_PIPE 1
@@ -254,7 +254,7 @@
 #define _EVENT_HAVE_SYS_EPOLL_H 1
 
 /* Define to 1 if you have the <sys/eventfd.h> header file. */
-#define _EVENT_HAVE_SYS_EVENTFD_H 1
+/* #undef _EVENT_HAVE_SYS_EVENTFD_H */
 
 /* Define to 1 if you have the <sys/event.h> header file. */
 /* #undef _EVENT_HAVE_SYS_EVENT_H */

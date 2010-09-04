@@ -2,6 +2,8 @@ frogserv
 config.h
 config.mk
 
+core.*
+
 server-init.cfg
 
 engine/*.[Po]
@@ -33,7 +35,10 @@ libevent2/event-config.h
 libevent2/include/Makefile
 libevent2/libtool
 libevent2/sample/Makefile
+libevent2/sample/*.o
+libevent2/sample/.libs
 libevent2/stamp-h1
 libevent2/test/.deps
 libevent2/test/.libs
 libevent2/test/Makefile
+libevent2/test/*.o
