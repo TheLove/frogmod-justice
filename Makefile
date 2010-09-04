@@ -38,13 +38,16 @@ enet/Makefile:
 	@echo "$(COMPILING)Configuring enet$(RESETC)"
 	@cd enet && ./configure
 
-$(eventdir)/.libs/libevent.a: $(eventdir)/Makefile
+$(eventdir)/.libs/libevent.a: $(eventdir)/Makefile $(eventdir)/include/event2/event-config.h
 	@echo "$(COMPILING)Building libevent$(RESETC)"
-	@cd $(eventdir) && $(MAKE) include/event2/event-config.h libevent.la
+	@cd $(eventdir) && $(MAKE) libevent.la
 
 $(eventdir)/Makefile: $(eventdir)/configure
 	@echo "$(COMPILING)Configuring libevent$(RESETC)"
 	@cd $(eventdir) && ./configure
+
+$(eventdir)/include/event2/event-config.h: $(eventdir)/Makefile
+	@cd $(eventdir) && $(MAKE) include/event2/event-config.h
 
 .PHONY: eclean
 eclean: clean
