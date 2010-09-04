@@ -732,10 +732,19 @@ namespace server
 		}
 	}
 
+	SVAR(frogchar, "@");
+	void processcommand(char *txt, int privilege = 0);
+	IRC::Source *scriptircsource = NULL;
 	void ircmsgcb(IRC::Source *source, char *msg) {
-		string buf;
-		color_irc2sauer(msg, buf);
-		outf(1 | OUT_NOIRC, "\f4%s \f2<%s> \f7%s", source->channel?source->channel->alias:"", source->peer->nick, msg);
+		if(NULL == strchr(frogchar, *msg)) {
+			string buf;
+			color_irc2sauer(msg, buf);
+			outf(1 | OUT_NOIRC, "\f4%s \f2<%s> \f7%s", source->channel?source->channel->alias:"", source->peer->nick, msg);
+		} else {
+			scriptircsource = source;
+			processcommand(msg+1);
+			scriptircsource = NULL;
+		}
 	}
 
 	void ircactioncb(IRC::Source *source, char *msg) {
@@ -890,7 +899,7 @@ namespace server
                 return false;
         }
     }
- 
+
     bool pickup(int i, int sender)         // server side item pickup, acknowledge first client that gets it
     {
         if((m_timed && gamemillis>=gamelimit) || !sents.inrange(i) || !sents[i].spawned) return false;
@@ -2441,10 +2450,136 @@ namespace server
 	}
 	ICOMMAND(mastermode, "i", (int *m), { if(m) setmastermode(*m); });
 
-	bool processtext(clientinfo *ci, char *text) {
-		outf(1 | OUT_NOGAME, "\f1<%s> \f0%s", ci->name, text);
-		return true;
+	void whisper(int cn, char *fmt, ...) {
+		clientinfo *ci = (clientinfo *)getclientinfo(cn);
+		if(!ci) return;
+		va_list(ap);
+		va_start(ap, fmt);
+		string str;
+		vsnprintf(str, MAXSTRLEN, fmt, ap);
+		va_end(ap);
+		sendf(cn, 1, "ris", N_SERVMSG, str);
 	}
+
+	clientinfo *scriptclient;
+	ICOMMAND(echo, "C", (char *s), {
+		if(httpoutbuf) evbuffer_add_printf(httpoutbuf, "%s", s);
+		if(scriptclient) whisper(scriptclient->clientnum, "%s", s);
+		if(scriptircsource) scriptircsource->reply("%s", s);
+	});
+
+	struct allowedcommand {
+		string cmd;
+		int nparams;
+		int privilege;
+	};
+	vector <allowedcommand> allowedcommands;
+	void allowcommand(char *cmd, int nparams, int privilege) {
+		allowedcommand &c = allowedcommands.add();
+		copystring(c.cmd, cmd);
+		c.nparams = nparams;
+		c.privilege = privilege;
+	}
+	ICOMMAND(allowcommand, "sii", (char *c, int *np, int *pv), {
+		if(c && *c) allowcommand(c, np?*np:0, pv?*pv:0); // default allow with zero params for everyone
+	});
+
+	void add_escaped_cubechar(evbuffer *buf, char c) {
+		if(strchr("\"^", c))
+			evbuffer_add_printf(buf, "^%c", c);
+		else evbuffer_add_printf(buf, "%c", c);
+	}
+
+	void processcommand(char *txt, int privilege) {
+		if(privilege < 2) {
+			string cmd;
+			char *c = txt;
+			char *d = cmd;
+			*d = 0;
+			while(c - txt < MAXSTRLEN-1 && *c && !isspace(*c)) { *(d++) = *(c++); *d = 0; }
+			loopv(allowedcommands) {
+				if(!strcmp(cmd, allowedcommands[i].cmd) && allowedcommands[i].privilege <= privilege) {
+					evbuffer *buf = evbuffer_new();
+					evbuffer_add_printf(buf, "%s ", cmd);
+					int state = 0; // 0 = outside param; 1 = inside param; 2 = inside quoted param
+					int nparams = 0;
+					while(*c && (nparams < allowedcommands[i].nparams || allowedcommands[i].nparams < 0)) {
+						switch(state) {
+							case 0: // outside param
+								if(!isspace(*c)) {
+									evbuffer_add_printf(buf, "\"");
+									if(*c == '"') {
+										state = 2; // entered quotes
+									} else {
+										state = 1; // entered param without quotes (no spaces)
+										add_escaped_cubechar(buf, *c);
+									}
+								}
+								break;
+							case 1: // inside unquoted param
+								if(isspace(*c)) { // end of param
+									state = 0;
+									evbuffer_add_printf(buf, "\" ");
+									nparams++;
+								} else add_escaped_cubechar(buf, *c);
+								break;
+							case 2: // inside quoted param
+								if(*c == '^') state = 3; // inside escape
+								else if(*c == '"') { // end of param
+									state = 0;
+									evbuffer_add_printf(buf, "\" ");
+									nparams++;
+								} else {
+									add_escaped_cubechar(buf, *c);
+								}
+								break;
+							case 3: // inside escaped char
+								add_escaped_cubechar(buf, *c); // no big deal
+								state = 2; // back to quotes mode
+								break;
+						}
+						c++;
+					}
+					if(state > 0) evbuffer_add_printf(buf, "\"");
+					char *execthis; int len = evbuffer_get_length(buf);
+					if(len) {
+						execthis = newstring(len + 1);
+						evbuffer_remove(buf, execthis, len);
+						execthis[len] = 0;
+						printf("execthis [%s]\n", execthis);
+						execute(execthis);
+						delete[] execthis;
+					}
+					evbuffer_free(buf);
+				}
+			}
+		} else execute(txt);
+	}
+
+	bool processtext(clientinfo *ci, char *text) {
+		if(!text || !*text) return false;
+		if(NULL == strchr(frogchar, text[0])) {
+			outf(1 | OUT_NOGAME, "\f1<%s> \f0%s", ci->name, text);
+			return true;
+		}
+		scriptclient = ci;
+		processcommand(text+1, ci->privilege);
+		scriptclient = NULL;
+		return false;
+	}
+
+	ICOMMAND(me, "C", (char *s), {
+		if(scriptclient) outf(1, "\f1* %s \f0%s", scriptclient->name, s);
+	});
+	ICOMMAND(whisper, "iC", (int *cn, char *s), {
+		if(cn && s) if(scriptclient || scriptircsource) {
+			char *ns = s;
+			while(*ns && !isspace(*ns)) ns++;
+			while(isspace(*ns)) ns++;
+			printf("whispering %s %s", scriptclient ? scriptclient->name : scriptircsource->peer->nick, ns);
+			whisper(*cn, "%s whispers: %s", scriptclient ? scriptclient->name : scriptircsource->peer->nick, ns);
+		}
+	});
 
     void parsepacket(int sender, int chan, packetbuf &p)     // has to parse exactly each byte of the packet
     {
@@ -2499,8 +2634,8 @@ namespace server
 #ifdef HAVE_GEOIP
 				const char *country = getclientcountry(ci->clientnum);
 				if(country) {
-					outf(2 | OUT_NOGAME, "%s connected from %s\n", ci->name, country);
-					outf(2 | OUT_NOIRC | OUT_NOCONSOLE, "%s is connected from %s\n", ci->name, country);
+					outf(2 | OUT_NOGAME, "%s connected from %s", ci->name, country);
+					outf(2 | OUT_NOIRC | OUT_NOCONSOLE, "%s is connected from %s", ci->name, country);
 				} else // fall through
 #endif
                 outf(2 | OUT_NOGAME, "%s connected\n", ci->name);
@@ -2767,12 +2902,14 @@ namespace server
 
             case N_TEXT:
             {
-                QUEUE_AI;
-                QUEUE_MSG;
                 getstring(text, p);
                 filtertext(text, text);
-                processtext(ci, text);
-                QUEUE_STR(text);
+
+	            if(processtext(ci, text)) {
+	                QUEUE_AI;
+	                QUEUE_INT(N_TEXT);
+	                QUEUE_STR(text);
+	            }
                 break;
             }
 
