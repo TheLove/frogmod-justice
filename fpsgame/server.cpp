@@ -2450,7 +2450,7 @@ namespace server
 	}
 	ICOMMAND(mastermode, "i", (int *m), { if(m) setmastermode(*m); });
 
-	void whisper(int cn, char *fmt, ...) {
+	void whisper(int cn, const char *fmt, ...) {
 		clientinfo *ci = (clientinfo *)getclientinfo(cn);
 		if(!ci) return;
 		va_list(ap);
