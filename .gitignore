@@ -33,6 +33,7 @@ libevent2/config.log
 libevent2/config.status
 libevent2/event-config.h
 libevent2/include/Makefile
+libevent2/include/event2/event-config.h
 libevent2/libtool
 libevent2/sample/Makefile
 libevent2/sample/*.o
