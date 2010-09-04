@@ -181,9 +181,6 @@ void conoutf(int type, const char *fmt, ...)
     va_end(args);
 }
 
-ICOMMAND(echo, "C", (char *s), {
-	if(httpoutbuf) evbuffer_add_printf(httpoutbuf, "%s", s);
-});
 ICOMMAND(say, "C", (char *s), {
 	outf(0, "\f4[ADMIN] \f7%s", s);
 });
@@ -1007,6 +1004,8 @@ void initserver(bool listen, bool dedicated)
 	ircinit();
 
     if(dedicated) execfile("server-init.cfg", false);
+    
+    execfile("stdlib.cfg");
 
     if(listen) setuplistenserver(dedicated);
 
