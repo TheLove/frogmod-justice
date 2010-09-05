@@ -13,12 +13,14 @@ require("classes/Player.php");
 require("classes/Match.php");
 require("classes/MatchPlayer.php");
 
+
 /**
  * Command line testing
  */
 if (isset($argv[1]) && $argv[1]) {
     $jsonString = $argv[1];
     $_SERVER['REMOTE_ADDR'] = "127.0.0.1";
+    Config::$debug = true;
 
     /**
      * HTTP Input
@@ -41,7 +43,7 @@ $jsonLogger->insert();
 $event = json_decode($jsonString);
 
 if (!is_object($event)) {
-    die("ERROR: could not create the JSON object!");
+    die("ERROR: could not create a JSON object from '".$jsonString."'");
 }
 
 /**
@@ -71,6 +73,8 @@ if (false) {
     $connectEvent->setPlayer($player);
     $connectEvent->setServer($server);
     $connectEvent->insert();
+
+    if (Config::$debug)
     echo "type[{$event->type}], $server, $player\n";
 
     /**
@@ -82,6 +86,8 @@ if (false) {
     $disconnectEvent->setServer($server);
     $disconnectEvent->setConnectionTime($event->connectionTime);
     $disconnectEvent->insert();
+
+    if (Config::$debug)
     echo "type[{$event->type}], $server, $player, connectionTime[{$disconnectEvent->getConnectionTime()}]\n";
 
 
@@ -99,6 +105,7 @@ if (false) {
     $kickEvent->setTarget($target);
     $kickEvent->insert();
 
+    if (Config::$debug)
     echo "type[{$event->type}], $server, kicker $player, target $target\n";
 
     /**
@@ -116,6 +123,8 @@ if (false) {
     $killEvent->setTarget($target);
     $killEvent->setGun($event->gun);
     $killEvent->insert();
+
+    if (Config::$debug)
     echo "type[{$event->type}], $server, killer $player, target $target\n";
 
     /**
@@ -126,6 +135,8 @@ if (false) {
     $suicideEvent->setServer($server);
     $suicideEvent->setPlayer($player);
     $suicideEvent->insert();
+
+    if (Config::$debug)
     echo "type[{$event->type}], $server, $player\n";
 
     /**
@@ -134,8 +145,6 @@ if (false) {
 } else if ($event->type == "intermission") {
     if (isset($event->server->map) && isset($event->server->gamemode)) {
         $match = Database::createMatch($server, $event->server->map, $event->server->gamemode);
-        echo "match created! id = " . $match->getId() . "\n";
-
         if (isset($event->players)) {
             foreach ($event->players as $jsonMatchPlayer) {
                 if (isset($jsonMatchPlayer->name, $jsonMatchPlayer->ip, $jsonMatchPlayer->skill)) {
@@ -147,13 +156,14 @@ if (false) {
                         $matchPlayer->setPlayer($player);
                         $matchPlayer->setParametersFromJSON($jsonMatchPlayer);
                         $matchPlayer->insert();
-                        echo "player[" . $player->getName() . ", " . $player->getIpAddress() . "]\n";
                     }
                 }
             }
         }
     }
 } else {
+
+    if (Config::$debug)
     echo "type[{$event->type}], $server\n";
 }
 ?>
