@@ -875,7 +875,7 @@ namespace server
         loopv(clients) {
             clientinfo *ci = clients[i];
             if(!ci) continue;
-            evbuffer_add_json_player(buf, ci, i < clients.length() - 1);
+            evbuffer_add_json_player(buf, ci, false, i < clients.length() - 1);
         }
         evbuffer_add_printf(buf, "]");
         evbuffer_add_printf(buf, "}");
