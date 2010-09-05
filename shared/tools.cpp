@@ -310,3 +310,41 @@ char *evhttp_uri_join(struct evhttp_uri *uri, void *buf, size_t limit)
 	return (char *)buf;
 #undef _URI_ADD
 }
+
+#ifdef HAVE_PROC
+bool proc_get_mem_usage(int64_t *vmrss, int64_t *vmsize) {
+	int64_t vsz = -1, rss = -1;
+	FILE *f = fopen("/proc/self/status", "r");
+	if(f) {
+		char buf[256];
+		while(fgets(buf, 256, f)) {
+			if(1 == sscanf(buf, "VmSize: %lld kB\n", &vsz)) {
+				if(rss > -1) {
+					if(vmrss) *vmrss = rss;
+					if(vmsize) *vmsize = vsz;
+					fclose(f);
+					return true;
+				}
+			}
+			if(1 == sscanf(buf, "VmRSS: %lld kB\n", &rss)) {
+				if(vsz > -1) {
+					if(vmrss) *vmrss = rss;
+					if(vmsize) *vmsize = vsz;
+					fclose(f);
+					return true;
+				}
+			}
+		}
+	}
+
+	if(vmrss) *vmrss = 0;
+	if(vmsize) *vmsize = 0;
+	return false;
+}
+
+void print_mem_usage(const char *pfx) {
+	int64_t vsz, rss;
+	proc_get_mem_usage(&vsz, &rss);
+	printf("print_mem_usage [%s] %lld %lld\n", pfx, vsz, rss);
+}
+#endif
