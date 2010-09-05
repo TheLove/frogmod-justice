@@ -609,9 +609,9 @@ namespace server
 			if(!ci) continue;
 			evbuffer_add_printf(buf, "\t{\n");
 			evbuffer_add_json_prop(buf, "name", ci->name);
-			evbuffer_add_json_prop(buf, "hostname", getclienthostname(i));
+			evbuffer_add_json_prop(buf, "hostname", getclienthostname(ci->clientnum));
 #ifdef HAVE_GEOIP
-			evbuffer_add_json_prop(buf, "country", getclientcountrynul(i));
+			evbuffer_add_json_prop(buf, "country", getclientcountrynul(ci->clientnum));
 #endif
 			evbuffer_add_json_prop(buf, "team", ci->team);
 			evbuffer_add_json_prop(buf, "clientnum", ci->clientnum);
