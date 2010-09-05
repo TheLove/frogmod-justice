@@ -101,6 +101,9 @@ struct Server {
 		return (*name == '#' || *name == '&'); //FIXME: get channel types from server messages
 	}
 
+	void raw(const char *fmt, ...);
+	void vraw(const char *fmt, va_list ap);
+
 	void speak(const char *fmt, ...); // speaks on all channels that we joined on this server
 	void vspeak(const char *fmt, va_list ap);
 
@@ -192,12 +195,13 @@ struct Client {
 		Server *s = findserv(host);
 		if(s) s->part(channel);
 	}
-	void cleanup(void);
 
 	void speak(const char *fmt, ...);
 	void vspeak(const char *fmt, va_list ap);
 	void speak(int verbosity, const char *fmt, ...);
 	void vspeak(int verbosity, const char *fmt, va_list ap);
+
+	void cleanup(void);
 };
 
 char *stripident(char *ident);

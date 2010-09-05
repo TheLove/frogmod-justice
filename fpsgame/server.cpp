@@ -1720,7 +1720,15 @@ namespace server
             demonextmatch = false;
             setupdemorecord();
         }
-    }
+
+		for(unsigned int i = 0; i < irc.servers.size(); i++) {
+			for(unsigned int j = 0; j < irc.servers[i]->channels.size(); j++) {
+				string ircserverdesc;
+				color_sauer2irc(serverdesc, ircserverdesc);
+				irc.servers[i]->raw("TOPIC %s :%s: %s on %s\n", irc.servers[i]->channels[j]->name, ircserverdesc, modename(gamemode), smapname);
+			}
+		}
+	}
 
     struct votecount
     {

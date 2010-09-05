@@ -306,6 +306,20 @@ void Server::parse(char *line) {
 	if(i > 0) process(prefix, params[0], params + 1, i - 1, trailing);
 }
 
+void Server::raw(const char  *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	this->vraw(fmt, ap);
+	va_end(ap);
+}
+
+void Server::vraw(const char *fmt, va_list ap) {
+	evbuffer *evb = evbuffer_new();
+	evbuffer_add_vprintf(evb, fmt, ap);
+	bufferevent_write_buffer(buf, evb);
+	evbuffer_free(evb);
+}
+
 void Server::speak(const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
