@@ -2580,6 +2580,21 @@ namespace server
 			whisper(*cn, "%s whispers: %s", scriptclient ? scriptclient->name : scriptircsource->peer->nick, ns);
 		}
 	});
+	void sendmap(clientinfo *ci) {
+        if(mapdata)
+        {
+            outf(2, "Sending map to %s...", ci->name);
+            sendfile(ci->clientnum, 2, mapdata, "ri", N_SENDMAP);
+            ci->needclipboard = totalmillis;
+        }
+        else whisper(ci->clientnum, "No map to send.");
+    }
+    ICOMMAND(sendto, "i", (int *cn), {
+    	if(cn) {
+    		clientinfo *ci = (clientinfo *)getclientinfo(*cn);
+    		sendmap(ci);
+    	}
+    });
 
     void parsepacket(int sender, int chan, packetbuf &p)     // has to parse exactly each byte of the packet
     {
@@ -3147,13 +3162,7 @@ namespace server
             }
 
             case N_GETMAP:
-                if(mapdata)
-                {
-                    outf(2, "Sending map to %s...", ci->name);
-                    sendfile(sender, 2, mapdata, "ri", N_SENDMAP);
-                    ci->needclipboard = totalmillis;
-                }
-                else sendf(sender, 1, "ris", N_SERVMSG, "no map to send");
+            	sendmap(ci);
                 break;
 
             case N_NEWMAP:
