@@ -1740,7 +1740,7 @@ namespace server
             demonextmatch = false;
             setupdemorecord();
         }
-		irctopic("%s: %s on %s\n", serverdesc, modename(gamemode), smapname, );
+		irctopic("%s: %s on %s\n", serverdesc, modename(gamemode), smapname);
 	}
 
     struct votecount
@@ -3255,6 +3255,7 @@ namespace server
                     notgotitems = false;
                     if(smode) smode->reset(true);
                     outf(2, "%s started a new map of size %d", ci->name, size);
+                    irctopic("%s: %s on new map", serverdesc, modename(gamemode));
                 }
                 QUEUE_MSG;
                 break;
