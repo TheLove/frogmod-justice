@@ -567,6 +567,56 @@ namespace server
 		evbuffer_add_printf(buf, "\": %f%s\n", val, comma?",":"");
 	}
 
+
+    void evbuffer_add_json_server(evbuffer *buf, bool comma = true) {
+        evbuffer_add_printf(buf, "\"server\": ");
+        evbuffer_add_printf(buf, "{");
+        evbuffer_add_json_prop(buf, "name", serverdesc);
+        evbuffer_add_json_prop(buf, "port", getvar("serverport"));
+        evbuffer_add_json_prop(buf, "time", totalmillis);
+        evbuffer_add_json_prop(buf, "map", smapname);
+        evbuffer_add_json_prop(buf, "gamemode", modename(gamemode), false);
+        evbuffer_add_printf(buf, "}%s", comma ? "," : "");
+    }
+
+    void evbuffer_add_json_player_simple(evbuffer *buf, const char *name, clientinfo *ci, bool comma = true) {
+        evbuffer_add_printf(buf, "\"");
+        evbuffer_add_json_string(buf, name);
+        evbuffer_add_printf(buf, "\": ");
+        evbuffer_add_printf(buf, "{");
+        evbuffer_add_json_prop(buf, "name", ci->name);
+        evbuffer_add_json_prop(buf, "ip", getclienthostname(ci->clientnum));
+        evbuffer_add_json_prop(buf, "skill", ci->state.skill, false);
+        evbuffer_add_printf(buf, "}%s", comma ? "," : "");
+    }
+
+
+    void evbuffer_add_json_player(evbuffer *buf, clientinfo *ci, bool comma = true) {
+        evbuffer_add_printf(buf, "{");
+        evbuffer_add_json_prop(buf, "name", ci->name);
+        evbuffer_add_json_prop(buf, "ip", getclienthostname(ci->clientnum));
+        evbuffer_add_json_prop(buf, "skill", ci->state.skill);
+        evbuffer_add_json_prop(buf, "team", ci->team);
+        evbuffer_add_json_prop(buf, "clientnum", ci->clientnum);
+        evbuffer_add_json_prop(buf, "privilege", ci->privilege);
+        evbuffer_add_json_prop(buf, "connectmillis", totalmillis - ci->connectmillis);
+        evbuffer_add_json_prop(buf, "playermodel", ci->playermodel);
+        evbuffer_add_json_prop(buf, "authname", ci->authname);
+        evbuffer_add_json_prop(buf, "ping", ci->ping);
+        evbuffer_add_printf(buf, "\"o\": [ %f, %f, %f ],", ci->state.o.x, ci->state.o.y, ci->state.o.z);
+        evbuffer_add_json_prop(buf, "state", ci->state.state);
+        evbuffer_add_json_prop(buf, "editstate", ci->state.editstate);
+        evbuffer_add_json_prop(buf, "frags", ci->state.frags);
+        evbuffer_add_json_prop(buf, "flags", ci->state.flags);
+        evbuffer_add_json_prop(buf, "deaths", ci->state.deaths);
+        evbuffer_add_json_prop(buf, "teamkills", ci->state.teamkills);
+        evbuffer_add_json_prop(buf, "shotdamage", ci->state.shotdamage);
+        evbuffer_add_json_prop(buf, "damage", ci->state.damage);
+        evbuffer_add_json_prop(buf, "effectiveness", (float)ci->state.effectiveness, false);
+        evbuffer_add_printf(buf, "}%s", comma ? "," : "");
+    }
+
+
 	void evhttp_request_redirect(evhttp_request *req, const char *url) {
 		evhttp_add_header(evhttp_request_get_output_headers(req), "Location", url);
 		evhttp_send_reply(req, 302, "Found", NULL);
