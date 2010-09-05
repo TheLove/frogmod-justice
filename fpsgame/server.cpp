@@ -591,10 +591,13 @@ namespace server
     }
 
 
-    void evbuffer_add_json_player(evbuffer *buf, clientinfo *ci, bool comma = true) {
+    void evbuffer_add_json_player(evbuffer *buf, clientinfo *ci, bool country, bool comma = true) {
         evbuffer_add_printf(buf, "{");
         evbuffer_add_json_prop(buf, "name", ci->name);
         evbuffer_add_json_prop(buf, "ip", getclienthostname(ci->clientnum));
+#ifdef HAVE_GEOIP
+		if(country) evbuffer_add_json_prop(buf, "country", getclientcountrynul(ci->clientnum));
+#endif
         evbuffer_add_json_prop(buf, "skill", ci->state.skill);
         evbuffer_add_json_prop(buf, "team", ci->team);
         evbuffer_add_json_prop(buf, "clientnum", ci->clientnum);
@@ -659,6 +662,8 @@ namespace server
 		loopv(clients) {
 			clientinfo *ci = clients[i];
 			if(!ci) continue;
+			evbuffer_add_json_player(buf, ci, true, i < clients.length() - 1);
+			/*
 			evbuffer_add_printf(buf, "\t{\n");
 			evbuffer_add_json_prop(buf, "name", ci->name);
 			evbuffer_add_json_prop(buf, "ip", getclienthostname(ci->clientnum));
@@ -683,6 +688,7 @@ namespace server
 			evbuffer_add_json_prop(buf, "damage", ci->state.damage);
 			evbuffer_add_json_prop(buf, "effectiveness", ci->state.effectiveness, false);
 			evbuffer_add_printf(buf, "}%s\n", (i<clients.length()-1)?",":"");
+			*/
 		}
 		evbuffer_add_printf(buf, "]");
 		evhttp_send_reply(req, 200, "OK", buf);
@@ -753,7 +759,22 @@ namespace server
 		}
 	}
 
-	SVAR(httphook, "");
+    enum {
+        HOOKFLAG_NOCONNECT = 1,
+        HOOKFLAG_NODISCONNECT = 2,
+        HOOKFLAG_NOKILL = 4,
+		HOOKFLAG_NOKICK = 8,
+		HOOKFLAG_NOSUICIDE = 16,
+        HOOKFLAG_NOINTERMISSION = 32
+    };
+
+    SVAR(httphook, "");
+    VAR(httphook_flags, 0, 4, 65535);
+
+    int http_hook_has_flag(int flag)
+    {
+        return httphook_flags & flag;
+    }
 
     void http_post_evbuffer(evbuffer *buffer)
     {
@@ -772,6 +793,96 @@ namespace server
             evhttp_uri_free(uri);
         }
     }
+
+    void http_post_event_connect(clientinfo *ci) {
+        if(http_hook_has_flag(HOOKFLAG_NOCONNECT)) return;
+        evbuffer *buf = evbuffer_new();
+        evbuffer_add_printf(buf, "{");
+        evbuffer_add_json_server(buf);
+        evbuffer_add_json_prop(buf, "type", "connect");
+        evbuffer_add_json_player_simple(buf, "player", ci, false);
+        evbuffer_add_printf(buf, "}");
+        http_post_evbuffer(buf);
+        evbuffer_free(buf);
+    }
+
+    void http_post_event_disconnect(clientinfo *ci) {
+        if(http_hook_has_flag(HOOKFLAG_NODISCONNECT)) return;
+        defformatstring(connectionTimeString)("%d", totalmillis - ci->connectmillis);
+        evbuffer *buf = evbuffer_new();
+        evbuffer_add_printf(buf, "{");
+        evbuffer_add_json_server(buf);
+        evbuffer_add_json_prop(buf, "type", "disconnect");
+        evbuffer_add_json_player_simple(buf, "player", ci);
+        evbuffer_add_json_prop(buf, "connectionTime", connectionTimeString, false);
+        evbuffer_add_printf(buf, "}");
+        http_post_evbuffer(buf);
+        evbuffer_free(buf);
+    }
+
+    void http_post_event_kick(clientinfo *player, clientinfo *target) {
+        if(http_hook_has_flag(HOOKFLAG_NOKICK)) return;
+		defformatstring(connectionTimeString)("%d", totalmillis - target->connectmillis);
+        evbuffer *buf = evbuffer_new();
+        evbuffer_add_printf(buf, "{");
+        evbuffer_add_json_server(buf);
+        evbuffer_add_json_prop(buf, "type", "kick");
+		if(player)
+			evbuffer_add_json_player_simple(buf, "player", player);
+        evbuffer_add_json_player_simple(buf, "target", target);
+		evbuffer_add_json_prop(buf, "connectionTime", connectionTimeString, false);
+        evbuffer_add_printf(buf, "}");
+        http_post_evbuffer(buf);
+        evbuffer_free(buf);
+    }
+
+    void http_post_event_kill(clientinfo *player, clientinfo *target, int gun) {
+        if(http_hook_has_flag(HOOKFLAG_NOKILL)) return;
+        defformatstring(gunString)("%d", gun);
+        evbuffer *buf = evbuffer_new();
+        evbuffer_add_printf(buf, "{");
+        evbuffer_add_json_server(buf);
+        evbuffer_add_json_prop(buf, "type", "kill");
+        evbuffer_add_json_player_simple(buf, "player", player);
+        evbuffer_add_json_player_simple(buf, "target", target);
+        evbuffer_add_json_prop(buf, "gun", gunString, false);
+        evbuffer_add_printf(buf, "}");
+        http_post_evbuffer(buf);
+        evbuffer_free(buf);
+    }
+
+	void http_post_event_suicide(clientinfo *player) {
+		if(http_hook_has_flag(HOOKFLAG_NOSUICIDE)) return;
+		evbuffer *buf = evbuffer_new();
+		evbuffer_add_printf(buf, "{");
+		evbuffer_add_json_server(buf);
+		evbuffer_add_json_prop(buf, "type", "suicide");
+		evbuffer_add_json_player_simple(buf, "player", player, false);
+		evbuffer_add_printf(buf, "}");
+		http_post_evbuffer(buf);
+		evbuffer_free(buf);
+	}
+
+    void http_post_event_intermission()
+    {
+        if(http_hook_has_flag(HOOKFLAG_NOINTERMISSION)) return;
+        evbuffer *buf = evbuffer_new();
+        evbuffer_add_printf(buf, "{");
+        evbuffer_add_json_server(buf);
+        evbuffer_add_json_prop(buf, "type", "intermission");
+        evbuffer_add_printf(buf, "\"players\": ");
+        evbuffer_add_printf(buf, "[");
+        loopv(clients) {
+            clientinfo *ci = clients[i];
+            if(!ci) continue;
+            evbuffer_add_json_player(buf, ci, i < clients.length() - 1);
+        }
+        evbuffer_add_printf(buf, "]");
+        evbuffer_add_printf(buf, "}");
+        http_post_evbuffer(buf);
+        evbuffer_free(buf);
+    }
+
 
 	void http_post_event(const char *first, ...) {
 		va_list ap;
@@ -1912,6 +2023,7 @@ namespace server
             sendf(-1, 1, "ri2", N_TIMEUP, 0);
             if(smode) smode->intermission();
             interm = gamemillis + 10000;
+			http_post_event_intermission();
         }
     }
 
@@ -1932,6 +2044,14 @@ namespace server
         }
         if(ts.health<=0)
         {
+            if(actor->clientnum != target->clientnum) {
+                http_post_event_kill(actor, target, gun);
+            }
+			else
+			{
+				http_post_event_suicide(actor);
+			}
+
             target->state.deaths++;
             if(actor!=target && isteam(actor->team, target->team)) actor->state.teamkills++;
             int fragvalue = smode ? smode->fragvalue(target, actor) : (target==actor || isteam(target->team, actor->team) ? -1 : 1);
@@ -1959,6 +2079,9 @@ namespace server
         if(gs.state!=CS_ALIVE) return;
         ci->state.frags += smode ? smode->fragvalue(ci, ci) : -1;
         ci->state.deaths++;
+
+		http_post_event_suicide(ci);
+
         sendf(-1, 1, "ri4", N_DIED, ci->clientnum, ci->clientnum, gs.frags);
         ci->position.setsize(0);
         if(smode) smode->died(ci, NULL);
@@ -2291,7 +2414,7 @@ namespace server
             savescore(ci);
             outf(2 | OUT_NOGAME, "%s left", ci->name);
             defformatstring(mil)("%d", totalmillis - ci->connectmillis);
-            http_post_event("action", "disconnect", "name", ci->name, "ip", getclienthostname(ci->clientnum), "millis", mil, NULL);
+			http_post_event_disconnect(ci);
             sendf(-1, 1, "ri2", N_CDIS, n);
             clients.removeobj(ci);
             aiman::removeai(ci);
@@ -2552,7 +2675,8 @@ namespace server
 			b.ip = getclientip(victim);
 			allowedips.removeobj(b.ip);
 			defformatstring(mil)("%d", totalmillis - ci->connectmillis);
-			http_post_event("action", "kick", "name", ci->name, "ip", getclienthostname(victim), "millis", mil, "kicker", m?m->name:"", "kicker_ip", m?getclienthostname(m->clientnum):"", NULL);
+			//http_post_event("action", "kick", "name", ci->name, "ip", getclienthostname(victim), "millis", mil, "kicker", m?m->name:"", "kicker_ip", m?getclienthostname(m->clientnum):"", NULL);
+			http_post_event_kick(m, ci);
 			disconnect_client(victim, DISC_KICK);
 		}
 	}
@@ -2805,7 +2929,7 @@ namespace server
 #endif
                 outf(2 | OUT_NOGAME, "%s connected\n", ci->name);
 
-                http_post_event("action", "connect", "name", ci->name, "ip", getclienthostname(ci->clientnum), NULL);
+				http_post_event_connect(ci);
             }
         }
         else if(chan==2)
