@@ -61,7 +61,7 @@ Loading...
 		<input type="submit" value="Run">
 		<a href="http://wiki.github.com/vampirefrog/frogmod-justice/commands" target="_blank">command list</a>
 	</form></li>
-	<li><form action="" method="GET" onsubmit="var elm = document.getElementById('saytext').value; execute('say '+elm); document.getElementById('saytext').value = ''; return false;">
+	<li><form action="" method="GET" onsubmit="var elm = document.getElementById('saytext'); if(elm && elm.value) { execute('say '+elm.value); elm.value = ''; } return false;">
 		<input type="text" id="saytext" name="command" size="30">
 		<input type="submit" value="Say">
 	</form></li>
