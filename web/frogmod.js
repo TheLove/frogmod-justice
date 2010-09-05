@@ -81,7 +81,7 @@ function convert_cube_string(str) {
     return tmp;
 }
 
-result_timeout = null;
+var result_timeout = null;
 function set_result(str) {
 	if(result_timeout) clearTimeout(result_timeout);
 	var div = document.getElementById('result');
@@ -135,7 +135,7 @@ function update_info() {
 	});
 }
 
-status_timeout = null;
+var status_timeout = null;
 function update_status() {
 	if(status_timeout) { clearTimeout(status_timeout); status_timeout = null; }
 	ajaxCall('/status', function() {
@@ -169,7 +169,10 @@ function player_icon(model) {
 	return '<img title="'+icons[model].replace('.png', '')+'" src="'+icons[model]+'">';
 }
 
-players_timeout = null;
+
+var sort_by = 'cn';
+var sort_reverse = false;
+var players_timeout = null;
 function update_players_cb(xhr) {
 	if(xhr.readyState == 4) {
 		var div = document.getElementById('players');
@@ -178,21 +181,45 @@ function update_players_cb(xhr) {
 				var players = eval('(' + xhr.responseText + ')');
 				if(players && players.length > 0) {
 					var html = new Array();
-					html.push('<table><tr><th>Cn</th><th>Name</th>');
-					if(admin) html.push('<th>IP</th>'); else html.push('<th>Country</th>');
-					html.push('<th>Team</th><th>Status</th>');
-					html.push('<th>Ping</th><th>Frags</th><th>Deaths</th><th>Teamkills</th><th>Shotdamage</th>');
-					html.push('<th>Damage</th><th>Effectiveness</th>');
-					html.push('<th>Uptime</th>'+(admin?'<th>Actions</th>':'')+'</tr>');
+					html.push('<table><tr>');
+					var arr = sort_reverse ? '&uarr;' : '&darr;';
+					var fields = [ 'cn', 'name', 'ip', 'country', 'team', 'status', 'ping', 'frags', 'deaths', 'teamkills', 'shotdamage', 'damage', 'effectiveness', 'uptime' ];
+					for(f in fields) {
+						if(fields[f] != 'ip' || admin)
+							html.push('<th><a href="#" onclick="if(sort_by == &quot;'+fields[f]+'&quot;) sort_reverse = !sort_reverse; else sort_reverse = false; sort_by = &quot;'+fields[f]+'&quot;; update_players(); return false;"'+(sort_by == fields[f] ? ' class="currentsort"' : '')+'>'+fields[f]+'</a> '+(sort_by == fields[f]?arr:'')+'</th>');
+					}
+					if(admin) html.push('<th>Actions</th>');
+					html.push('</tr>');
+					players.sort(function(a, b) {
+						switch(sort_by) {
+							case 'cn':
+								return parseInt(a.clientnum) - parseInt(b.clientnum);
+							case 'ping':
+							case 'frags':
+							case 'deaths':
+							case 'teamkills':
+							case 'shotdamage':
+							case 'damage':
+								return parseInt(a[sort_by]) - parseFloat(b[sort_by]);
+							case 'effectiveness':
+								return parseFloat(a.shotdamage) - parseFloat(b.shotdamage);
+							case 'status':
+								return states[a.state].localeCompare(states[b.state]);
+							case 'uptime':
+								return a.connectmillis - b.connectmillis;
+							case 'ip':
+								return a.hostname - b.hostname;
+							default:
+								return a[sort_by].toLowerCase().localeCompare(b[sort_by].toLowerCase());
+						}
+					});
+					if(sort_reverse) players.reverse();
 					for(p in players) {
 						html.push('<tr'+(players[p].state == 5 ? ' class="spec"': (players[p].state == 1 ? ' class="dead"' :''))+'>');
 						html.push('<td>'+players[p].clientnum+'</td>');
 						html.push('<td class="privilege'+players[p].privilege+'">' + player_icon(players[p].playermodel) + ' ' + escapeHtml(players[p].name) + '</td>');
-						html.push('<td>');
-						if(admin) html.push(players[p].hostname + ' (');
-						if(players[p].country) html.push(players[p].country);
-						if(admin) html.push(')');
-						html.push('</td>');
+						if(admin) html.push('<td>'+players[p].hostname+'</td>');
+						html.push('<td>'+players[p].country+'</td>');
 						html.push('<td>'+players[p].team+'</td>');
 						html.push('<td>'+states[players[p].state]+'</td>');
 						html.push('<td>'+players[p].ping+'</td>');
