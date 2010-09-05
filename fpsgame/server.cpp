@@ -704,6 +704,25 @@ namespace server
 	}
 
 	SVAR(httphook, "");
+
+    void http_post_evbuffer(evbuffer *buffer)
+    {
+        if(httphook[0]) {
+            evhttp_uri *uri = evhttp_uri_parse(httphook);
+            if(!uri) return;
+            evhttp_connection *con = evhttp_connection_base_new(evbase, dnsbase, uri->host, uri->port?uri->port:80);
+            if(con) {
+                if(serverip[0]) evhttp_connection_set_local_address(con, serverip);
+                evhttp_request *req = evhttp_request_new(http_event_cb, NULL);
+                evbuffer *output_buffer = evhttp_request_get_output_buffer(req);
+                evbuffer_add_buffer(output_buffer, buffer);
+                evhttp_add_header(evhttp_request_get_output_headers(req), "Host", uri->host);
+                evhttp_make_request(con, req, EVHTTP_REQ_POST, uri->query);
+            }
+            evhttp_uri_free(uri);
+        }
+    }
+
 	void http_post_event(const char *first, ...) {
 		va_list ap;
 		if(httphook[0]) {
