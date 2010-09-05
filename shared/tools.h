@@ -1012,4 +1012,10 @@ void evhttp_uri_free(struct evhttp_uri *uri);
  */
 char *evhttp_uri_join(struct evhttp_uri *uri, void *buf, size_t limit);
 
+
+# ifdef HAVE_PROC
+bool proc_get_mem_usage(int64_t *vmrss, int64_t *vmsize);
+void print_mem_usage(const char *pfx = "");
+# endif
+
 #endif

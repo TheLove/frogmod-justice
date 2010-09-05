@@ -773,6 +773,12 @@ namespace server
 	void ircnickcb(IRC::Source *s, char *newnick) {
 		outf(2 | OUT_NOIRC, "\f4%s \f1%s \f7 is now known as \f1%s", s->server->alias, s->peer->nick, newnick);
 	}
+	ICOMMAND(ircecho, "C", (const char *msg), {
+		string buf;
+		color_sauer2irc((char *)msg, buf);
+		if(scriptircsource) scriptircsource->speak(buf);
+	});
+
 
 	void ircinit() {
 		irc.channel_message_cb = ircmsgcb;
@@ -1668,6 +1674,20 @@ namespace server
         sendpacket(-1, 1, p.finalize(), ci->clientnum);
     }
 
+	void irctopic(const char *fmt, ...) {
+		va_list ap;
+		va_start(ap, fmt);
+		for(unsigned int i = 0; i < irc.servers.size(); i++) {
+			for(unsigned int j = 0; j < irc.servers[i]->channels.size(); j++) {
+				string topic, colortopic;
+				vformatstring(topic, fmt, ap);
+				color_sauer2irc(topic, colortopic);
+				irc.servers[i]->raw("TOPIC %s :%s\n", irc.servers[i]->channels[j]->name, colortopic);
+			}
+		}
+		va_end(ap);
+	}
+
     void changemap(const char *s, int mode)
     {
         stopdemo();
@@ -1720,14 +1740,7 @@ namespace server
             demonextmatch = false;
             setupdemorecord();
         }
-
-		for(unsigned int i = 0; i < irc.servers.size(); i++) {
-			for(unsigned int j = 0; j < irc.servers[i]->channels.size(); j++) {
-				string ircserverdesc;
-				color_sauer2irc(serverdesc, ircserverdesc);
-				irc.servers[i]->raw("TOPIC %s :%s: %s on %s\n", irc.servers[i]->channels[j]->name, ircserverdesc, modename(gamemode), smapname);
-			}
-		}
+		irctopic("%s: %s on %s\n", serverdesc, modename(gamemode), smapname, );
 	}
 
     struct votecount
@@ -2160,6 +2173,7 @@ namespace server
 	void clearbans();
     void noclients()
     {
+    	irctopic("%s: empty", serverdesc);
         clearbans();
         aiman::clearai();
     }
@@ -2385,6 +2399,63 @@ namespace server
             }
         }
     }
+
+#ifdef HAVE_PROC
+	ICOMMAND(getrss, "", (), {
+		int64_t vmrss;
+		proc_get_mem_usage(&vmrss, NULL);
+		defformatstring(s)("%lldkB", vmrss);
+		result(s);
+	});
+	ICOMMAND(getvsz, "", (), {
+		int64_t vmsize;
+		proc_get_mem_usage(NULL, &vmsize);
+		defformatstring(s)("%lldkB", vmsize);
+		result(s);
+	});
+#else
+	ICOMMAND(getrss, "", (), result(""));
+	ICOMMAND(getvsz, "", (), result(""));
+#endif
+    ICOMMAND(listclients, "", (), {
+        vector<char> buf;
+        string cn;
+        loopv(clients) if(clients[i])
+        {
+        	if(i > 0) buf.add(' ');
+            formatstring(cn)("%d", clients[i]->clientnum);
+            buf.put(cn, strlen(cn));
+        }
+        buf.add('\0');
+        result(buf.getbuf());
+    });
+    ICOMMAND(getclientname, "i", (int *cn), {
+		if(!cn) result("");
+        clientinfo *ci = (clientinfo *)getclientinfo(*cn);
+        result(ci ? ci->name : "");
+    });
+    ICOMMAND(getclientteam, "i", (int *cn), {
+		if(!cn) result("");
+        clientinfo *ci = (clientinfo *)getclientinfo(*cn);
+        result(ci ? ci->team : "");
+    });
+    ICOMMAND(getclienthostname, "i", (int *cn), result(getclienthostname(*cn)));
+#ifdef HAVE_GEOIP
+    ICOMMAND(getclientcountry, "i", (int *cn), result(getclientcountry(*cn)));
+#else
+    ICOMMAND(getclientcountry, "i", (int *cn), result(""));
+#endif
+    ICOMMAND(getclientuptime, "i", (int *cn), { //FIXME: split into more functions (ie timestr)
+    	clientinfo *ci = (clientinfo *)getclientinfo(*cn);
+    	intret(ci ? totalmillis - ci->connectmillis : 0);
+    });
+    int ispriv(int cn, int minimum) {
+    	clientinfo *ci = (clientinfo *)getclientinfo(cn);
+    	if(ci && ci->privilege >= minimum) return 1;
+    	return 0;
+    }
+    ICOMMAND(ismaster, "i", (int *cn), intret(ispriv(*cn, PRIV_MASTER)));
+    ICOMMAND(isadmin, "i", (int *cn), intret(ispriv(*cn, PRIV_ADMIN)));
 
 	ICOMMAND(givemaster, "i", (int *cn), {
 		if(cn) {

@@ -970,7 +970,6 @@ void evinit() {
 	evbase = event_base_new();
 	dnsbase = evdns_base_new(evbase, 1);
 	event_base_priority_init(evbase, 10);
-
 }
 
 /***************************
@@ -989,12 +988,6 @@ ICOMMAND(ircjoin, "ssiss", (const char *s, const char *c, const int *v, const ch
 ICOMMAND(ircpart, "ss", (const char *s, const char *c), {
 	if(s && *s && c && *c) irc.part(s, c);
 });
-ICOMMAND(ircecho, "C", (const char *msg), {
-//	string buf;
-//	color_sauer2irc((char *)msg, buf);
-//	if(scriptircsource) scriptircsource->speak(buf);
-});
-
 void initserver(bool listen, bool dedicated)
 {
 #ifdef HAVE_GEOIP
