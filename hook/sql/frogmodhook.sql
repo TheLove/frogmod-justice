@@ -47,6 +47,7 @@ DROP TABLE IF EXISTS `json`;
 CREATE TABLE `json` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `ip_address` varchar(16) DEFAULT NULL,
   `json` text,
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;

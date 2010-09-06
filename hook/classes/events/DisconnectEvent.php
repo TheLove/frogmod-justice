@@ -1,25 +1,9 @@
 <?php
 
-class DisconnectEvent {
+class DisconnectEvent extends BasicDatabaseModel {
 
     public static $databaseTable = "disconnects";
-    private $id, $timestamp, $server, $player, $connectionTime;
-
-    public function getId() {
-        return $this->id;
-    }
-
-    public function setId($id) {
-        $this->id = $id;
-    }
-
-    public function getTimestamp() {
-        return $this->timestamp;
-    }
-
-    public function setTimestamp($timestamp) {
-        $this->timestamp = $timestamp;
-    }
+    private $server, $player, $connectionTime;
 
     public function getServer() {
         return $this->server;
@@ -47,8 +31,9 @@ class DisconnectEvent {
 
     public function insert() {
         $pdo = Database::getPDO();
-        $stmt = $pdo->prepare("INSERT INTO " . self::$databaseTable . " (timestamp, server_id, player_id, connection_time) VALUES(now(), :server_id, :player_id, :connection_time)");
+        $stmt = $pdo->prepare("INSERT INTO " . self::$databaseTable . " (timestamp, server_id, player_id, connection_time) VALUES(:timestamp, :server_id, :player_id, :connection_time)");
         $stmt->execute(array(
+            'timestamp' => $this->getTimestampString(),
             'server_id' => $this->server->getId(),
             'player_id' => $this->player->getId(),
             'connection_time' => $this->connectionTime

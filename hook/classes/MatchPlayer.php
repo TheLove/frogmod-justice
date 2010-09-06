@@ -1,9 +1,9 @@
 <?php
 
-class MatchPlayer {
+class MatchPlayer extends BasicDatabaseModel {
 
     public static $databaseTable = "matchplayers";
-    private $id, $match, $player, $frags, $deaths, $flags, $teamkills, $shotDamage, $damage, $effectiveness;
+    private $match, $player, $frags, $deaths, $flags, $teamkills, $shotDamage, $damage, $effectiveness;
 
     public function setParametersFromJSON($json)
     {
@@ -17,14 +17,6 @@ class MatchPlayer {
             $this->setDamage($json->damage);
             $this->setEffectiveness($json->effectiveness);
         }
-    }
-
-    public function getId() {
-        return $this->id;
-    }
-
-    public function setId($id) {
-        $this->id = $id;
     }
 
     public function getMatch() {
@@ -104,9 +96,10 @@ class MatchPlayer {
         $stmt = $pdo->prepare(
                         "INSERT INTO " . self::$databaseTable . " (" .
                         "timestamp, match_id, player_id, frags, deaths, flags, teamkills, shotdamage, damage, effectiveness) " .
-                        "VALUES(now(), :match_id, :player_id, :frags, :deaths, :flags, :teamkills, :shotdamage, :damage, :effectiveness)"
+                        "VALUES(:timestamp, :match_id, :player_id, :frags, :deaths, :flags, :teamkills, :shotdamage, :damage, :effectiveness)"
         );
         $stmt->execute(array(
+            'timestamp' => $this->getTimestampString(),
             'match_id' => $this->match->getId(),
             'player_id' => $this->player->getId(),
             'frags' => $this->frags,
@@ -117,6 +110,7 @@ class MatchPlayer {
             'damage' => $this->damage,
             'effectiveness' => $this->effectiveness
         ));
+        $this->setId($pdo->lastInsertId());
     }
 
 }

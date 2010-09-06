@@ -1,25 +1,9 @@
 <?php
 
-class KillEvent {
+class KillEvent extends BasicDatabaseModel {
 
     public static $databaseTable = "kills";
-    private $id, $timestamp, $server, $player, $target, $gun;
-
-    public function getId() {
-        return $this->id;
-    }
-
-    public function setId($id) {
-        $this->id = $id;
-    }
-
-    public function getTimestamp() {
-        return $this->timestamp;
-    }
-
-    public function setTimestamp($timestamp) {
-        $this->timestamp = $timestamp;
-    }
+    private $server, $player, $target, $gun;
 
     public function getServer() {
         return $this->server;
@@ -55,8 +39,9 @@ class KillEvent {
 
     public function insert() {
         $pdo = Database::getPDO();
-        $stmt = $pdo->prepare("INSERT INTO " . self::$databaseTable . " (timestamp, server_id, player_id, target_id, gun) VALUES(now(), :server_id, :player_id, :target_id, :gun)");
+        $stmt = $pdo->prepare("INSERT INTO " . self::$databaseTable . " (timestamp, server_id, player_id, target_id, gun) VALUES(:timestamp, :server_id, :player_id, :target_id, :gun)");
         $stmt->execute(array(
+            'timestamp' => $this->getTimestampString(),
             'server_id' => $this->server->getId(),
             'player_id' => $this->player->getId(),
             'target_id' => $this->target->getId(),

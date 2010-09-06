@@ -1,26 +1,10 @@
 <?php
 
-class ConnectEvent {
+class ConnectEvent extends BasicDatabaseModel {
 
     public static $databaseTable = "connects";
-    private $id, $timestamp, $server, $player;
-
-    public function getId() {
-        return $this->id;
-    }
-
-    public function setId($id) {
-        $this->id = $id;
-    }
-
-    public function getTimestamp() {
-        return $this->timestamp;
-    }
-
-    public function setTimestamp($timestamp) {
-        $this->timestamp = $timestamp;
-    }
-
+    private $server, $player;
+    
     public function getServer() {
         return $this->server;
     }
@@ -39,8 +23,9 @@ class ConnectEvent {
 
     public function insert() {
         $pdo = Database::getPDO();
-        $stmt = $pdo->prepare("INSERT INTO " . self::$databaseTable . " (timestamp, server_id, player_id) VALUES(now(), :server_id, :player_id)");
+        $stmt = $pdo->prepare("INSERT INTO " . self::$databaseTable . " (timestamp, server_id, player_id) VALUES(:timestamp, :server_id, :player_id)");
         $stmt->execute(array(
+            'timestamp' => $this->getTimestampString(),
             'server_id' => $this->server->getId(),
             'player_id' => $this->player->getId()
         ));

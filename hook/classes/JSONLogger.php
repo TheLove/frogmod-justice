@@ -1,24 +1,16 @@
 <?php
 
-class JSONLogger {
+class JSONLogger extends BasicDatabaseModel {
 
     public static $databaseTable = "json";
-    private $id, $timestamp, $json;
+    private $ipAddress, $json;
 
-    public function getId() {
-        return $this->id;
+    public function getIpAddress() {
+        return $this->ipAddress;
     }
 
-    public function setId($id) {
-        $this->id = $id;
-    }
-
-    public function getTimestamp() {
-        return $this->timestamp;
-    }
-
-    public function setTimestamp($timestamp) {
-        $this->timestamp = $timestamp;
+    public function setIpAddress($ipAddress) {
+        $this->ipAddress = $ipAddress;
     }
 
     public function getJson() {
@@ -29,14 +21,18 @@ class JSONLogger {
         $this->json = preg_replace("|[\r\n\t]|", "", $json);
     }
 
-    public function insert() {
+    public function insert($timestamp = null) {
+        if ($timestamp == null)
+            $timestamp = time();
         $pdo = Database::getPDO();
-        $stmt = $pdo->prepare("INSERT INTO " . self::$databaseTable . " (timestamp, json) VALUES(now(), :json)");
+        $stmt = $pdo->prepare("INSERT INTO " . self::$databaseTable . " (timestamp, ip_address, json) VALUES(:timestamp, :ip_address, :json)");
         $stmt->execute(array(
-            "json" => $this->json
+            'timestamp' => $this->getTimestampString(),
+            'ip_address' => $this->ipAddress,
+            'json' => $this->json
         ));
     }
-}
 
+}
 
 ?>
