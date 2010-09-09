@@ -663,32 +663,6 @@ namespace server
 			clientinfo *ci = clients[i];
 			if(!ci) continue;
 			evbuffer_add_json_player(buf, ci, true, i < clients.length() - 1);
-			/*
-			evbuffer_add_printf(buf, "\t{\n");
-			evbuffer_add_json_prop(buf, "name", ci->name);
-			evbuffer_add_json_prop(buf, "ip", getclienthostname(ci->clientnum));
-#ifdef HAVE_GEOIP
-			evbuffer_add_json_prop(buf, "country", getclientcountrynul(ci->clientnum));
-#endif
-			evbuffer_add_json_prop(buf, "team", ci->team);
-			evbuffer_add_json_prop(buf, "clientnum", ci->clientnum);
-			evbuffer_add_json_prop(buf, "privilege", ci->privilege);
-			evbuffer_add_json_prop(buf, "connectmillis", totalmillis - ci->connectmillis);
-			evbuffer_add_json_prop(buf, "playermodel", ci->playermodel);
-			evbuffer_add_json_prop(buf, "authname", ci->authname);
-			evbuffer_add_json_prop(buf, "ping", ci->ping);
-			evbuffer_add_printf(buf, "\t\"o\": [ %f, %f, %f ],\n", ci->state.o.x, ci->state.o.y, ci->state.o.z);
-			evbuffer_add_json_prop(buf, "state", ci->state.state);
-			evbuffer_add_json_prop(buf, "editstate", ci->state.editstate);
-			evbuffer_add_json_prop(buf, "frags", ci->state.frags);
-			evbuffer_add_json_prop(buf, "flags", ci->state.flags);
-			evbuffer_add_json_prop(buf, "deaths", ci->state.deaths);
-			evbuffer_add_json_prop(buf, "teamkills", ci->state.teamkills);
-			evbuffer_add_json_prop(buf, "shotdamage", ci->state.shotdamage);
-			evbuffer_add_json_prop(buf, "damage", ci->state.damage);
-			evbuffer_add_json_prop(buf, "effectiveness", ci->state.effectiveness, false);
-			evbuffer_add_printf(buf, "}%s\n", (i<clients.length()-1)?",":"");
-			*/
 		}
 		evbuffer_add_printf(buf, "]");
 		evhttp_send_reply(req, 200, "OK", buf);
