@@ -49,7 +49,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "event2/event.h"
 #include "event2/util.h"
@@ -422,8 +421,11 @@ logfn(int severity, const char *msg)
 {
 	logsev = severity;
 	tt_want(msg);
-	if (msg)
+	if (msg) {
+		if (logmsg)
+			free(logmsg);
 		logmsg = strdup(msg);
+	}
 }
 
 static int fatal_want_severity = 0;
@@ -832,7 +834,7 @@ test_evutil_rand(void *arg)
 					buf2[j] |= buf1[j];
 					++counts[(unsigned char)buf1[j]];
 				} else {
-					assert(buf1[j] == 0);
+					tt_assert(buf1[j] == 0);
 					tt_int_op(buf1[j], ==, 0);
 
 				}

@@ -38,21 +38,24 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 @PTHREADS_TRUE@am__append_1 = libevent_pthreads.la
-@OPENSSL_TRUE@am__append_2 = libevent_openssl.la
-@SELECT_BACKEND_TRUE@am__append_3 = select.c
-@POLL_BACKEND_TRUE@am__append_4 = poll.c
-@DEVPOLL_BACKEND_TRUE@am__append_5 = devpoll.c
-@KQUEUE_BACKEND_TRUE@am__append_6 = kqueue.c
-@EPOLL_BACKEND_TRUE@am__append_7 = epoll.c
-@EVPORT_BACKEND_TRUE@am__append_8 = evport.c
-@SIGNAL_SUPPORT_TRUE@am__append_9 = signal.c
+@PTHREADS_TRUE@am__append_2 = libevent_pthreads.pc
+@OPENSSL_TRUE@am__append_3 = libevent_openssl.la
+@OPENSSL_TRUE@am__append_4 = libevent_openssl.pc
+@SELECT_BACKEND_TRUE@am__append_5 = select.c
+@POLL_BACKEND_TRUE@am__append_6 = poll.c
+@DEVPOLL_BACKEND_TRUE@am__append_7 = devpoll.c
+@KQUEUE_BACKEND_TRUE@am__append_8 = kqueue.c
+@EPOLL_BACKEND_TRUE@am__append_9 = epoll.c
+@EVPORT_BACKEND_TRUE@am__append_10 = evport.c
+@SIGNAL_SUPPORT_TRUE@am__append_11 = signal.c
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(dist_bin_SCRIPTS) \
 	$(include_HEADERS) $(noinst_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(srcdir)/libevent.pc.in $(top_srcdir)/configure ChangeLog \
-	compile config.guess config.sub depcomp epoll_sub.c install-sh \
-	ltmain.sh missing
+	$(srcdir)/libevent.pc.in $(srcdir)/libevent_openssl.pc.in \
+	$(srcdir)/libevent_pthreads.pc.in $(top_srcdir)/configure \
+	ChangeLog compile config.guess config.sub depcomp epoll_sub.c \
+	install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/acx_pthread.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
@@ -64,7 +67,8 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES = libevent.pc
+CONFIG_CLEAN_FILES = libevent.pc libevent_openssl.pc \
+	libevent_pthreads.pc
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -392,7 +396,7 @@ RELEASE = -release 2.0
 #        Return (current+1:0:0)
 #
 # Once an RC is out, DO NOT MAKE ANY ABI-BREAKING CHANGES IN THAT SERIES.
-VERSION_INFO = 2:0:0
+VERSION_INFO = 3:0:1
 
 # History:          RELEASE    VERSION_INFO
 #  2.0.1-alpha --     2.0        1:0:0
@@ -400,9 +404,10 @@ VERSION_INFO = 2:0:0
 #  2.0.3-alpha --                2:0:0  (should have incremented; didn't.)
 #  2.0.4-alpha --                3:0:0
 #  2.0.5-beta  --                4:0:0
-#  2.0.6-rc  --       2.0        2:0:0
+#  2.0.6-rc    --     2.0        2:0:0
+#  2.0.7-rc   --      2.0        3:0:1
 # Planned:
-#  2.0.7-stable --    2.0        2:1:0  (Assuming no ABI change)
+#  2.0.8-stable --    2.0        3:1:1  (Assuming no ABI change)
 #
 # If Libevent 2.1.1 makes 'struct event' etc opaque in the headers:
 #  2.1.1-alpha --     2.1        1:0:0
@@ -428,7 +433,7 @@ VERSION_INFO = 2:0:0
 # series won't be binary-compatible.
 dist_bin_SCRIPTS = event_rpcgen.py
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = libevent.pc
+pkgconfig_DATA = libevent.pc $(am__append_2) $(am__append_4)
 
 # These sources are conditionally added by configure.in or conditionally
 # included from other files.
@@ -446,20 +451,20 @@ EXTRA_DIST = \
 	$(PLATFORM_DEPENDENT_SRC)
 
 lib_LTLIBRARIES = libevent.la libevent_core.la libevent_extra.la \
-	$(am__append_1) $(am__append_2)
+	$(am__append_1) $(am__append_3)
 SUBDIRS = . include sample test
 @BUILD_WIN32_FALSE@SYS_LIBS = 
 @BUILD_WIN32_TRUE@SYS_LIBS = -lws2_32
-@BUILD_WIN32_FALSE@SYS_SRC = $(am__append_3) $(am__append_4) \
-@BUILD_WIN32_FALSE@	$(am__append_5) $(am__append_6) \
+@BUILD_WIN32_FALSE@SYS_SRC = $(am__append_5) $(am__append_6) \
 @BUILD_WIN32_FALSE@	$(am__append_7) $(am__append_8) \
-@BUILD_WIN32_FALSE@	$(am__append_9)
+@BUILD_WIN32_FALSE@	$(am__append_9) $(am__append_10) \
+@BUILD_WIN32_FALSE@	$(am__append_11)
 @BUILD_WIN32_TRUE@SYS_SRC = win32select.c evthread_win32.c \
 @BUILD_WIN32_TRUE@	buffer_iocp.c event_iocp.c \
-@BUILD_WIN32_TRUE@	bufferevent_async.c $(am__append_3) \
-@BUILD_WIN32_TRUE@	$(am__append_4) $(am__append_5) \
+@BUILD_WIN32_TRUE@	bufferevent_async.c $(am__append_5) \
 @BUILD_WIN32_TRUE@	$(am__append_6) $(am__append_7) \
-@BUILD_WIN32_TRUE@	$(am__append_8) $(am__append_9)
+@BUILD_WIN32_TRUE@	$(am__append_8) $(am__append_9) \
+@BUILD_WIN32_TRUE@	$(am__append_10) $(am__append_11)
 @BUILD_WIN32_FALSE@SYS_INCLUDES = 
 @BUILD_WIN32_TRUE@SYS_INCLUDES = -IWIN32-Code
 BUILT_SOURCES = ./include/event2/event-config.h
@@ -559,6 +564,10 @@ $(srcdir)/config.h.in:  $(am__configure_deps)
 distclean-hdr:
 	-rm -f config.h stamp-h1
 libevent.pc: $(top_builddir)/config.status $(srcdir)/libevent.pc.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+libevent_openssl.pc: $(top_builddir)/config.status $(srcdir)/libevent_openssl.pc.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+libevent_pthreads.pc: $(top_builddir)/config.status $(srcdir)/libevent_pthreads.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)

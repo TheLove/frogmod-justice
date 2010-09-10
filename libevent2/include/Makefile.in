@@ -71,8 +71,8 @@ am__nobase_list = $(am__nobase_strip_setup); \
 am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
-am__installdirs = "$(DESTDIR)$(includedir)"
-HEADERS = $(nobase_include_HEADERS)
+am__installdirs = "$(DESTDIR)$(includedir)" "$(DESTDIR)$(includedir)"
+HEADERS = $(nobase_include_HEADERS) $(nobase_nodist_include_HEADERS)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -211,6 +211,7 @@ EVENT2_EXPORT = \
 	event2/http.h \
 	event2/http_compat.h \
 	event2/http_struct.h \
+	event2/keyvalq_struct.h \
 	event2/listener.h \
 	event2/rpc.h \
 	event2/rpc_compat.h \
@@ -221,7 +222,8 @@ EVENT2_EXPORT = \
 	event2/util.h
 
 EXTRA_SRC = $(EVENT2_EXPORT)
-nobase_include_HEADERS = $(EVENT2_EXPORT) ./event2/event-config.h
+nobase_include_HEADERS = $(EVENT2_EXPORT)
+nobase_nodist_include_HEADERS = ./event2/event-config.h
 all: all-am
 
 .SUFFIXES:
@@ -280,6 +282,29 @@ install-nobase_includeHEADERS: $(nobase_include_HEADERS)
 uninstall-nobase_includeHEADERS:
 	@$(NORMAL_UNINSTALL)
 	@list='$(nobase_include_HEADERS)'; test -n "$(includedir)" || list=; \
+	$(am__nobase_strip_setup); files=`$(am__nobase_strip)`; \
+	test -n "$$files" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(includedir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(includedir)" && rm -f $$files
+install-nobase_nodist_includeHEADERS: $(nobase_nodist_include_HEADERS)
+	@$(NORMAL_INSTALL)
+	test -z "$(includedir)" || $(MKDIR_P) "$(DESTDIR)$(includedir)"
+	@list='$(nobase_nodist_include_HEADERS)'; test -n "$(includedir)" || list=; \
+	$(am__nobase_list) | while read dir files; do \
+	  xfiles=; for file in $$files; do \
+	    if test -f "$$file"; then xfiles="$$xfiles $$file"; \
+	    else xfiles="$$xfiles $(srcdir)/$$file"; fi; done; \
+	  test -z "$$xfiles" || { \
+	    test "x$$dir" = x. || { \
+	      echo "$(MKDIR_P) '$(DESTDIR)$(includedir)/$$dir'"; \
+	      $(MKDIR_P) "$(DESTDIR)$(includedir)/$$dir"; }; \
+	    echo " $(INSTALL_HEADER) $$xfiles '$(DESTDIR)$(includedir)/$$dir'"; \
+	    $(INSTALL_HEADER) $$xfiles "$(DESTDIR)$(includedir)/$$dir" || exit $$?; }; \
+	done
+
+uninstall-nobase_nodist_includeHEADERS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(nobase_nodist_include_HEADERS)'; test -n "$(includedir)" || list=; \
 	$(am__nobase_strip_setup); files=`$(am__nobase_strip)`; \
 	test -n "$$files" || exit 0; \
 	echo " ( cd '$(DESTDIR)$(includedir)' && rm -f" $$files ")"; \
@@ -371,7 +396,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(HEADERS)
 installdirs:
-	for dir in "$(DESTDIR)$(includedir)"; do \
+	for dir in "$(DESTDIR)$(includedir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -419,7 +444,8 @@ info: info-am
 
 info-am:
 
-install-data-am: install-nobase_includeHEADERS
+install-data-am: install-nobase_includeHEADERS \
+	install-nobase_nodist_includeHEADERS
 
 install-dvi: install-dvi-am
 
@@ -463,7 +489,8 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-nobase_includeHEADERS
+uninstall-am: uninstall-nobase_includeHEADERS \
+	uninstall-nobase_nodist_includeHEADERS
 
 .MAKE: install-am install-strip
 
@@ -474,11 +501,13 @@ uninstall-am: uninstall-nobase_includeHEADERS
 	install-data-am install-dvi install-dvi-am install-exec \
 	install-exec-am install-html install-html-am install-info \
 	install-info-am install-man install-nobase_includeHEADERS \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags uninstall uninstall-am uninstall-nobase_includeHEADERS
+	install-nobase_nodist_includeHEADERS install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-generic \
+	mostlyclean-libtool pdf pdf-am ps ps-am tags uninstall \
+	uninstall-am uninstall-nobase_includeHEADERS \
+	uninstall-nobase_nodist_includeHEADERS
 
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

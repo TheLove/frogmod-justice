@@ -471,7 +471,7 @@ static void
 notify_base_cbq_callback(struct deferred_cb_queue *cb, void *baseptr)
 {
 	struct event_base *base = baseptr;
-	if (!EVBASE_IN_THREAD(base))
+	if (EVBASE_NEED_NOTIFY(base))
 		evthread_notify_base(base);
 }
 
@@ -604,8 +604,7 @@ event_base_new_with_config(const struct event_config *cfg)
 		EVTHREAD_ALLOC_LOCK(base->th_base_lock,
 		    EVTHREAD_LOCKTYPE_RECURSIVE);
 		base->defer_queue.lock = base->th_base_lock;
-		EVTHREAD_ALLOC_LOCK(base->current_event_lock,
-		    EVTHREAD_LOCKTYPE_RECURSIVE);
+		EVTHREAD_ALLOC_COND(base->current_event_cond);
 		r = evthread_make_base_notifiable(base);
 		if (r<0) {
 			event_base_free(base);
@@ -616,19 +615,19 @@ event_base_new_with_config(const struct event_config *cfg)
 
 #ifdef WIN32
 	if (cfg && (cfg->flags & EVENT_BASE_FLAG_STARTUP_IOCP))
-		event_base_start_iocp(base);
+		event_base_start_iocp(base, cfg->n_cpus_hint);
 #endif
 
 	return (base);
 }
 
 int
-event_base_start_iocp(struct event_base *base)
+event_base_start_iocp(struct event_base *base, int n_cpus)
 {
 #ifdef WIN32
 	if (base->iocp)
 		return 0;
-	base->iocp = event_iocp_port_launch();
+	base->iocp = event_iocp_port_launch(n_cpus);
 	if (!base->iocp) {
 		event_warnx("%s: Couldn't launch IOCP", __func__);
 		return -1;
@@ -636,6 +635,20 @@ event_base_start_iocp(struct event_base *base)
 	return 0;
 #else
 	return -1;
+#endif
+}
+
+void
+event_base_stop_iocp(struct event_base *base)
+{
+#ifdef WIN32
+	int rv;
+
+	if (!base->iocp)
+		return;
+	rv = event_iocp_shutdown(base->iocp, -1);
+	EVUTIL_ASSERT(rv >= 0);
+	base->iocp = NULL;
 #endif
 }
 
@@ -654,6 +667,10 @@ event_base_free(struct event_base *base)
 
 	/* XXX(niels) - check for internal events first */
 	EVUTIL_ASSERT(base);
+
+#ifdef WIN32
+	event_base_stop_iocp(base);
+#endif
 
 	/* threading fds if we have them */
 	if (base->th_notify_fd[0] != -1) {
@@ -731,8 +748,7 @@ event_base_free(struct event_base *base)
 	event_changelist_freemem(&base->changelist);
 
 	EVTHREAD_FREE_LOCK(base->th_base_lock, EVTHREAD_LOCKTYPE_RECURSIVE);
-	EVTHREAD_FREE_LOCK(base->current_event_lock,
-	    EVTHREAD_LOCKTYPE_RECURSIVE);
+	EVTHREAD_FREE_COND(base->current_event_cond);
 
 	mm_free(base);
 }
@@ -744,14 +760,22 @@ event_reinit(struct event_base *base)
 	const struct eventop *evsel;
 	int res = 0;
 	struct event *ev;
+	int was_notifiable = 0;
 
 	EVBASE_ACQUIRE_LOCK(base, th_base_lock);
 
 	evsel = base->evsel;
 
+#if 0
+	/* Right now, reinit always takes effect, since even if the
+	   backend doesn't require it, the signal socketpair code does.
+
+	   XXX
+	 */
 	/* check if this event mechanism requires reinit */
 	if (!evsel->need_reinit)
 		goto done;
+#endif
 
 	/* prevent internal delete */
 	if (base->sig.ev_signal_added) {
@@ -763,6 +787,23 @@ event_reinit(struct event_base *base)
 			event_queue_remove(base, &base->sig.ev_signal,
 			    EVLIST_ACTIVE);
 		base->sig.ev_signal_added = 0;
+	}
+	if (base->th_notify_fd[0] != -1) {
+		/* we cannot call event_del here because the base has
+		 * not been reinitialized yet. */
+		was_notifiable = 1;
+		event_queue_remove(base, &base->th_notify,
+		    EVLIST_INSERTED);
+		if (base->th_notify.ev_flags & EVLIST_ACTIVE)
+			event_queue_remove(base, &base->th_notify,
+			    EVLIST_ACTIVE);
+		base->sig.ev_signal_added = 0;
+		EVUTIL_CLOSESOCKET(base->th_notify_fd[0]);
+		if (base->th_notify_fd[1] != -1)
+			EVUTIL_CLOSESOCKET(base->th_notify_fd[1]);
+		base->th_notify_fd[0] = -1;
+		base->th_notify_fd[1] = -1;
+		event_debug_unassign(&base->th_notify);
 	}
 
 	if (base->evsel->dealloc != NULL)
@@ -788,6 +829,9 @@ event_reinit(struct event_base *base)
 				res = -1;
 		}
 	}
+
+	if (was_notifiable && res == 0)
+		res = evthread_make_base_notifiable(base);
 
 done:
 	EVBASE_RELEASE_LOCK(base, th_base_lock);
@@ -896,6 +940,15 @@ event_config_require_features(struct event_config *cfg,
 }
 
 int
+event_config_set_num_cpus_hint(struct event_config *cfg, int cpus)
+{
+	if (!cfg)
+		return (-1);
+	cfg->n_cpus_hint = cpus;
+	return (0);
+}
+
+int
 event_priority_init(int npriorities)
 {
 	return event_base_priority_init(current_base, npriorities);
@@ -939,7 +992,7 @@ static int
 event_haveevents(struct event_base *base)
 {
 	/* Caller must hold th_base_lock */
-	return (base->event_count > 0);
+	return (base->virtual_event_count > 0 || base->event_count > 0);
 }
 
 /* "closure" function called when processing active signal events */
@@ -1217,9 +1270,10 @@ event_process_active_single_queue(struct event_base *base,
 			ev->ev_res & EV_WRITE ? "EV_WRITE " : " ",
 			ev->ev_callback));
 
+#ifndef _EVENT_DISABLE_THREAD_SUPPORT
 		base->current_event = ev;
-
-		EVBASE_ACQUIRE_LOCK(base, current_event_lock);
+		base->current_event_waiters = 0;
+#endif
 
 		switch (ev->ev_closure) {
 		case EV_CLOSURE_SIGNAL:
@@ -1236,9 +1290,14 @@ event_process_active_single_queue(struct event_base *base,
 			break;
 		}
 
-		EVBASE_RELEASE_LOCK(base, current_event_lock);
 		EVBASE_ACQUIRE_LOCK(base, th_base_lock);
+#ifndef _EVENT_DISABLE_THREAD_SUPPORT
 		base->current_event = NULL;
+		if (base->current_event_waiters) {
+			base->current_event_waiters = 0;
+			EVTHREAD_COND_BROADCAST(base->current_event_cond);
+		}
+#endif
 
 		if (base->event_break)
 			return -1;
@@ -1247,9 +1306,10 @@ event_process_active_single_queue(struct event_base *base,
 }
 
 /*
-   Process all the defered_cb entries in 'queue'.  If *breakptr becomes set to
-   1, stop.  Requires that we start out holding the lock on 'queue'; releases
-   the lock around 'queue' for each deferred_cb we process.
+   Process up to MAX_DEFERRED of the defered_cb entries in 'queue'.  If
+   *breakptr becomes set to 1, stop.  Requires that we start out holding
+   the lock on 'queue'; releases the lock around 'queue' for each deferred_cb
+   we process.
  */
 static int
 event_process_deferred_callbacks(struct deferred_cb_queue *queue, int *breakptr)
@@ -1257,6 +1317,7 @@ event_process_deferred_callbacks(struct deferred_cb_queue *queue, int *breakptr)
 	int count = 0;
 	struct deferred_cb *cb;
 
+#define MAX_DEFERRED 16
 	while ((cb = TAILQ_FIRST(&queue->deferred_cb_list))) {
 		cb->queued = 0;
 		TAILQ_REMOVE(&queue->deferred_cb_list, cb, cb_next);
@@ -1264,12 +1325,14 @@ event_process_deferred_callbacks(struct deferred_cb_queue *queue, int *breakptr)
 		UNLOCK_DEFERRED_QUEUE(queue);
 
 		cb->cb(cb, cb->arg);
-		++count;
-		if (*breakptr)
-			return -1;
 
 		LOCK_DEFERRED_QUEUE(queue);
+		if (*breakptr)
+			return -1;
+		if (++count == MAX_DEFERRED)
+			break;
 	}
+#undef MAX_DEFERRED
 	return count;
 }
 
@@ -1358,18 +1421,20 @@ event_loopbreak(void)
 int
 event_base_loopbreak(struct event_base *event_base)
 {
+	int r = 0;
 	if (event_base == NULL)
 		return (-1);
 
 	EVBASE_ACQUIRE_LOCK(event_base, th_base_lock);
 	event_base->event_break = 1;
-	EVBASE_RELEASE_LOCK(event_base, th_base_lock);
 
-	if (!EVBASE_IN_THREAD(event_base)) {
-		return evthread_notify_base(event_base);
+	if (EVBASE_NEED_NOTIFY(event_base)) {
+		r = evthread_notify_base(event_base);
 	} else {
-		return (0);
+		r = (0);
 	}
+	EVBASE_RELEASE_LOCK(event_base, th_base_lock);
+	return r;
 }
 
 int
@@ -1814,6 +1879,11 @@ event_add(struct event *ev, const struct timeval *tv)
 {
 	int res;
 
+	if (EVUTIL_FAILURE_CHECK(!ev->ev_base)) {
+		event_warnx("%s: event has no event_base set.", __func__);
+		return -1;
+	}
+
 	EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
 
 	res = event_add_internal(ev, tv, 0);
@@ -1863,8 +1933,12 @@ evthread_notify_base_eventfd(struct event_base *base)
 static int
 evthread_notify_base(struct event_base *base)
 {
+	EVENT_BASE_ASSERT_LOCKED(base);
 	if (!base->th_notify_fn)
 		return -1;
+	if (base->is_notify_pending)
+		return 0;
+	base->is_notify_pending = 1;
 	return base->th_notify_fn(base);
 }
 
@@ -1879,7 +1953,6 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 	struct event_base *base = ev->ev_base;
 	int res = 0;
 	int notify = 0;
-	int need_cur_lock;
 
 	EVENT_BASE_ASSERT_LOCKED(base);
 	_event_debug_assert_is_setup(ev);
@@ -1908,10 +1981,13 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 	 * callback, and we are not the main thread, then we want to wait
 	 * until the callback is done before we mess with the event, or else
 	 * we can race on ev_ncalls and ev_pncalls below. */
-	need_cur_lock = (base->current_event == ev) &&
-	    (ev->ev_events & EV_SIGNAL);
-	if (need_cur_lock)
-		EVBASE_ACQUIRE_LOCK(base, current_event_lock);
+#ifndef _EVENT_DISABLE_THREAD_SUPPORT
+	if (base->current_event == ev && (ev->ev_events & EV_SIGNAL)
+	    && !EVBASE_IN_THREAD(base)) {
+		++base->current_event_waiters;
+		EVTHREAD_COND_WAIT(base->current_event_cond, base->th_base_lock);
+	}
+#endif
 
 	if ((ev->ev_events & (EV_READ|EV_WRITE|EV_SIGNAL)) &&
 	    !(ev->ev_flags & (EVLIST_INSERTED|EVLIST_ACTIVE))) {
@@ -2011,13 +2087,10 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 	}
 
 	/* if we are not in the right thread, we need to wake up the loop */
-	if (res != -1 && notify && !EVBASE_IN_THREAD(base))
+	if (res != -1 && notify && EVBASE_NEED_NOTIFY(base))
 		evthread_notify_base(base);
 
 	_event_debug_note_add(ev);
-
-	if (need_cur_lock)
-		EVBASE_RELEASE_LOCK(base, current_event_lock);
 
 	return (res);
 }
@@ -2026,6 +2099,11 @@ int
 event_del(struct event *ev)
 {
 	int res;
+
+	if (EVUTIL_FAILURE_CHECK(!ev->ev_base)) {
+		event_warnx("%s: event has no event_base set.", __func__);
+		return -1;
+	}
 
 	EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
 
@@ -2042,7 +2120,6 @@ event_del_internal(struct event *ev)
 {
 	struct event_base *base;
 	int res = 0, notify = 0;
-	int need_cur_lock;
 
 	event_debug(("event_del: %p, callback %p",
 		 ev, ev->ev_callback));
@@ -2059,9 +2136,12 @@ event_del_internal(struct event *ev)
 	 * when this function returns, it will be safe to free the
 	 * user-supplied argument. */
 	base = ev->ev_base;
-	need_cur_lock = (base->current_event == ev);
-	if (need_cur_lock)
-		EVBASE_ACQUIRE_LOCK(base, current_event_lock);
+#ifndef _EVENT_DISABLE_THREAD_SUPPORT
+	if (base->current_event == ev && !EVBASE_IN_THREAD(base)) {
+		++base->current_event_waiters;
+		EVTHREAD_COND_WAIT(base->current_event_cond, base->th_base_lock);
+	}
+#endif
 
 	EVUTIL_ASSERT(!(ev->ev_flags & ~EVLIST_ALL));
 
@@ -2101,11 +2181,8 @@ event_del_internal(struct event *ev)
 	}
 
 	/* if we are not in the right thread, we need to wake up the loop */
-	if (res != -1 && notify && !EVBASE_IN_THREAD(base))
+	if (res != -1 && notify && EVBASE_NEED_NOTIFY(base))
 		evthread_notify_base(base);
-
-	if (need_cur_lock)
-		EVBASE_RELEASE_LOCK(base, current_event_lock);
 
 	_event_debug_note_del(ev);
 
@@ -2115,6 +2192,11 @@ event_del_internal(struct event *ev)
 void
 event_active(struct event *ev, int res, short ncalls)
 {
+	if (EVUTIL_FAILURE_CHECK(!ev->ev_base)) {
+		event_warnx("%s: event has no event_base set.", __func__);
+		return;
+	}
+
 	EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
 
 	_event_debug_assert_is_setup(ev);
@@ -2129,7 +2211,6 @@ void
 event_active_nolock(struct event *ev, int res, short ncalls)
 {
 	struct event_base *base;
-	int need_cur_lock = 0;
 
 	/* We get different kinds of events, add them together */
 	if (ev->ev_flags & EVLIST_ACTIVE) {
@@ -2144,16 +2225,17 @@ event_active_nolock(struct event *ev, int res, short ncalls)
 	ev->ev_res = res;
 
 	if (ev->ev_events & EV_SIGNAL) {
-		need_cur_lock = (base->current_event == ev);
-		if (need_cur_lock)
-			EVBASE_ACQUIRE_LOCK(base, current_event_lock);
+#ifndef _EVENT_DISABLE_THREAD_SUPPORT
+		if (base->current_event == ev && !EVBASE_IN_THREAD(base)) {
+			++base->current_event_waiters;
+			EVTHREAD_COND_WAIT(base->current_event_cond, base->th_base_lock);
+		}
+#endif
 		ev->ev_ncalls = ncalls;
 		ev->ev_pncalls = NULL;
 	}
 
 	event_queue_insert(base, ev, EVLIST_ACTIVE);
-	if (need_cur_lock)
-		EVBASE_RELEASE_LOCK(base, current_event_lock);
 }
 
 void
@@ -2200,8 +2282,6 @@ event_deferred_cb_schedule(struct deferred_cb_queue *queue,
 		cb->queued = 1;
 		TAILQ_INSERT_TAIL(&queue->deferred_cb_list, cb, cb_next);
 		++queue->active_count;
-		/* XXXX Can we get away with doing this only when adding
-		 * the first active deferred_cb to the queue? */
 		if (queue->notify_fn)
 			queue->notify_fn(queue, queue->notify_arg);
 	}
@@ -2547,11 +2627,15 @@ evthread_notify_drain_eventfd(evutil_socket_t fd, short what, void *arg)
 {
 	ev_uint64_t msg;
 	ev_ssize_t r;
+	struct event_base *base = arg;
 
 	r = read(fd, (void*) &msg, sizeof(msg));
 	if (r<0 && errno != EAGAIN) {
 		event_sock_warn(fd, "Error reading from eventfd");
 	}
+	EVBASE_ACQUIRE_LOCK(base, th_base_lock);
+	base->is_notify_pending = 0;
+	EVBASE_RELEASE_LOCK(base, th_base_lock);
 }
 #endif
 
@@ -2559,6 +2643,7 @@ static void
 evthread_notify_drain_default(evutil_socket_t fd, short what, void *arg)
 {
 	unsigned char buf[1024];
+	struct event_base *base = arg;
 #ifdef WIN32
 	while (recv(fd, (char*)buf, sizeof(buf), 0) > 0)
 		;
@@ -2566,6 +2651,10 @@ evthread_notify_drain_default(evutil_socket_t fd, short what, void *arg)
 	while (read(fd, (char*)buf, sizeof(buf)) > 0)
 		;
 #endif
+
+	EVBASE_ACQUIRE_LOCK(base, th_base_lock);
+	base->is_notify_pending = 0;
+	EVBASE_RELEASE_LOCK(base, th_base_lock);
 }
 
 int
@@ -2664,4 +2753,23 @@ event_base_dump_events(struct event_base *base, FILE *output)
 					(e->ev_res&EV_TIMEOUT)?" Timeout active":"");
 		}
 	}
+}
+
+void
+event_base_add_virtual(struct event_base *base)
+{
+	EVBASE_ACQUIRE_LOCK(base, th_base_lock);
+	base->virtual_event_count++;
+	EVBASE_RELEASE_LOCK(base, th_base_lock);
+}
+
+void
+event_base_del_virtual(struct event_base *base)
+{
+	EVBASE_ACQUIRE_LOCK(base, th_base_lock);
+	EVUTIL_ASSERT(base->virtual_event_count > 0);
+	base->virtual_event_count--;
+	if (base->virtual_event_count == 0 && EVBASE_NEED_NOTIFY(base))
+		evthread_notify_base(base);
+	EVBASE_RELEASE_LOCK(base, th_base_lock);
 }

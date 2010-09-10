@@ -75,9 +75,10 @@ am__regress_SOURCES_DIST = regress.c regress_buffer.c regress_http.c \
 	regress_dns.c regress_testutils.c regress_testutils.h \
 	regress_rpc.c regress.gen.c regress.gen.h regress_et.c \
 	regress_bufferevent.c regress_listener.c regress_util.c \
-	tinytest.c regress_main.c regress_minheap.c regress_pthread.c \
+	tinytest.c regress_main.c regress_minheap.c regress_thread.c \
 	regress_zlib.c regress_iocp.c regress_ssl.c
-@PTHREADS_TRUE@am__objects_1 = regress-regress_pthread.$(OBJEXT)
+@BUILD_WIN32_FALSE@@PTHREADS_TRUE@am__objects_1 = regress-regress_thread.$(OBJEXT)
+@BUILD_WIN32_TRUE@am__objects_1 = regress-regress_thread.$(OBJEXT)
 @ZLIB_REGRESS_TRUE@am__objects_2 = regress-regress_zlib.$(OBJEXT)
 @BUILD_WIN32_TRUE@am__objects_3 = regress-regress_iocp.$(OBJEXT)
 @OPENSSL_TRUE@am__objects_4 = regress-regress_ssl.$(OBJEXT)
@@ -292,9 +293,10 @@ regress_SOURCES = regress.c regress_buffer.c regress_http.c \
 	regress_rpc.c regress.gen.c regress.gen.h regress_et.c \
 	regress_bufferevent.c regress_listener.c regress_util.c \
 	tinytest.c regress_main.c regress_minheap.c \
-	$(regress_pthread_SOURCES) $(regress_zlib_SOURCES) \
+	$(regress_thread_SOURCES) $(regress_zlib_SOURCES) \
 	$(am__append_2) $(am__append_3)
-@PTHREADS_TRUE@regress_pthread_SOURCES = regress_pthread.c
+@BUILD_WIN32_TRUE@regress_thread_SOURCES = regress_thread.c
+@PTHREADS_TRUE@regress_thread_SOURCES = regress_thread.c
 @ZLIB_REGRESS_TRUE@regress_zlib_SOURCES = regress_zlib.c
 regress_LDADD = ../libevent.la $(PTHREAD_LIBS) $(ZLIB_LIBS) \
 	$(am__append_4)
@@ -410,10 +412,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_listener.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_minheap.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_pthread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_rpc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_ssl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_testutils.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_util.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-regress_zlib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regress-tinytest.Po@am__quote@
@@ -641,19 +643,19 @@ regress-regress_minheap.obj: regress_minheap.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -c -o regress-regress_minheap.obj `if test -f 'regress_minheap.c'; then $(CYGPATH_W) 'regress_minheap.c'; else $(CYGPATH_W) '$(srcdir)/regress_minheap.c'; fi`
 
-regress-regress_pthread.o: regress_pthread.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -MT regress-regress_pthread.o -MD -MP -MF $(DEPDIR)/regress-regress_pthread.Tpo -c -o regress-regress_pthread.o `test -f 'regress_pthread.c' || echo '$(srcdir)/'`regress_pthread.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/regress-regress_pthread.Tpo $(DEPDIR)/regress-regress_pthread.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='regress_pthread.c' object='regress-regress_pthread.o' libtool=no @AMDEPBACKSLASH@
+regress-regress_thread.o: regress_thread.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -MT regress-regress_thread.o -MD -MP -MF $(DEPDIR)/regress-regress_thread.Tpo -c -o regress-regress_thread.o `test -f 'regress_thread.c' || echo '$(srcdir)/'`regress_thread.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/regress-regress_thread.Tpo $(DEPDIR)/regress-regress_thread.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='regress_thread.c' object='regress-regress_thread.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -c -o regress-regress_pthread.o `test -f 'regress_pthread.c' || echo '$(srcdir)/'`regress_pthread.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -c -o regress-regress_thread.o `test -f 'regress_thread.c' || echo '$(srcdir)/'`regress_thread.c
 
-regress-regress_pthread.obj: regress_pthread.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -MT regress-regress_pthread.obj -MD -MP -MF $(DEPDIR)/regress-regress_pthread.Tpo -c -o regress-regress_pthread.obj `if test -f 'regress_pthread.c'; then $(CYGPATH_W) 'regress_pthread.c'; else $(CYGPATH_W) '$(srcdir)/regress_pthread.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/regress-regress_pthread.Tpo $(DEPDIR)/regress-regress_pthread.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='regress_pthread.c' object='regress-regress_pthread.obj' libtool=no @AMDEPBACKSLASH@
+regress-regress_thread.obj: regress_thread.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -MT regress-regress_thread.obj -MD -MP -MF $(DEPDIR)/regress-regress_thread.Tpo -c -o regress-regress_thread.obj `if test -f 'regress_thread.c'; then $(CYGPATH_W) 'regress_thread.c'; else $(CYGPATH_W) '$(srcdir)/regress_thread.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/regress-regress_thread.Tpo $(DEPDIR)/regress-regress_thread.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='regress_thread.c' object='regress-regress_thread.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -c -o regress-regress_pthread.obj `if test -f 'regress_pthread.c'; then $(CYGPATH_W) 'regress_pthread.c'; else $(CYGPATH_W) '$(srcdir)/regress_pthread.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -c -o regress-regress_thread.obj `if test -f 'regress_thread.c'; then $(CYGPATH_W) 'regress_thread.c'; else $(CYGPATH_W) '$(srcdir)/regress_thread.c'; fi`
 
 regress-regress_zlib.o: regress_zlib.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(regress_CFLAGS) $(CFLAGS) -MT regress-regress_zlib.o -MD -MP -MF $(DEPDIR)/regress-regress_zlib.Tpo -c -o regress-regress_zlib.o `test -f 'regress_zlib.c' || echo '$(srcdir)/'`regress_zlib.c

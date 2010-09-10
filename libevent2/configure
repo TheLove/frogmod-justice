@@ -3123,7 +3123,7 @@ fi
 
 # Define the identity of the package.
  PACKAGE=libevent
- VERSION=2.0.6-rc
+ VERSION=2.0.7-rc
 
 
 cat >>confdefs.h <<_ACEOF
@@ -3166,7 +3166,7 @@ am__tar='${AMTAR} chof - "$$tardir"'; am__untar='${AMTAR} xf -'
 ac_config_headers="$ac_config_headers config.h"
 
 
-$as_echo "#define NUMERIC_VERSION 0x02000600" >>confdefs.h
+$as_echo "#define NUMERIC_VERSION 0x02000700" >>confdefs.h
 
 
 if test "$prefix" = "NONE"; then
@@ -12184,6 +12184,7 @@ main(int argc, char **argv)
         if ((kq = kqueue()) == -1)
 		exit(1);
 
+	memset(&ev, 0, sizeof(ev));
 	ev.ident = fd[1];
 	ev.filter = EVFILT_WRITE;
 	ev.flags = EV_ADD | EV_ENABLE;
@@ -13525,7 +13526,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 fi
 
-ac_config_files="$ac_config_files libevent.pc"
+ac_config_files="$ac_config_files libevent.pc libevent_openssl.pc libevent_pthreads.pc"
 
 ac_config_files="$ac_config_files Makefile include/Makefile test/Makefile sample/Makefile"
 
@@ -14542,6 +14543,8 @@ do
     "depfiles") CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "libevent.pc") CONFIG_FILES="$CONFIG_FILES libevent.pc" ;;
+    "libevent_openssl.pc") CONFIG_FILES="$CONFIG_FILES libevent_openssl.pc" ;;
+    "libevent_pthreads.pc") CONFIG_FILES="$CONFIG_FILES libevent_pthreads.pc" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "include/Makefile") CONFIG_FILES="$CONFIG_FILES include/Makefile" ;;
     "test/Makefile") CONFIG_FILES="$CONFIG_FILES test/Makefile" ;;
