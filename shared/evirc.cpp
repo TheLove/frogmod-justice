@@ -314,6 +314,8 @@ void Server::raw(const char  *fmt, ...) {
 }
 
 void Server::vraw(const char *fmt, va_list ap) {
+	if(state != Active) return;
+
 	evbuffer *evb = evbuffer_new();
 	evbuffer_add_vprintf(evb, fmt, ap);
 	bufferevent_write_buffer(buf, evb);
