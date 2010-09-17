@@ -521,7 +521,7 @@ namespace server
 			evbuffer_add(buf, contents, len);
 			evhttp_send_reply(req, 200, "OK", buf);
 			evbuffer_free(buf);
-			delete contents;
+			delete[] contents;
 		} else evhttp_send_error(req, 404, "Not Found");
 	}
 
