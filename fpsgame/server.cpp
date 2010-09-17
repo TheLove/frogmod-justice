@@ -766,6 +766,15 @@ namespace server
                 evhttp_make_request(con, req, EVHTTP_REQ_POST, uri->query);
             }
             evhttp_uri_free(uri);
+
+            // some debug
+        	printf("posting evbuffer to %s: [", httphook);
+        	int l = evbuffer_get_length(buffer);
+        	char *str = new char[l+1];
+        	evbuffer_remove(buffer, str, l);
+        	str[l] = 0;
+        	printf("%s]\n", str);
+        	delete[] str;
         }
     }
 
@@ -861,32 +870,22 @@ namespace server
 
 	void http_post_event(const char *first, ...) {
 		va_list ap;
-		if(httphook[0]) {
-			evhttp_uri *uri = evhttp_uri_parse(httphook);;
-			if(!uri) return;
-			evhttp_connection *con = evhttp_connection_base_new(evbase, dnsbase, uri->host, uri->port?uri->port:80);
-			if(con) {
-				if(serverip[0]) evhttp_connection_set_local_address(con, serverip);
-				evhttp_request *req = evhttp_request_new(http_event_cb, NULL);
-				evbuffer *buf = evhttp_request_get_output_buffer(req);
-				evbuffer_add_printf(buf, "{\n");
-				evbuffer_add_json_prop(buf, "serverdesc", serverdesc);
-				evbuffer_add_json_prop(buf, "serverport", getvar("serverport"));
-				evbuffer_add_json_prop(buf, "totalmillis", totalmillis);
-				const char *name = first, *value;
-				va_start(ap, first);
-				while(name) {
-					value = va_arg(ap, const char *);
-					const char *nname = va_arg(ap, const char *);
-					evbuffer_add_json_prop(buf, name, value, nname!=NULL);
-					name = nname;
-				}
-				evbuffer_add_printf(buf, "}");
-				evhttp_add_header(evhttp_request_get_output_headers(req), "Host", uri->host);
-				evhttp_make_request(con, req, EVHTTP_REQ_POST, uri->query);
-			}
-			evhttp_uri_free(uri);
+		evbuffer *evb = evbuffer_new();
+		evbuffer_add_printf(evb, "{\n");
+		evbuffer_add_json_prop(evb, "serverdesc", serverdesc);
+		evbuffer_add_json_prop(evb, "serverport", getvar("serverport"));
+		evbuffer_add_json_prop(evb, "totalmillis", totalmillis);
+		const char *name = first, *value;
+		va_start(ap, first);
+		while(name) {
+			value = va_arg(ap, const char *);
+			const char *nname = va_arg(ap, const char *);
+			evbuffer_add_json_prop(evb, name, value, nname!=NULL);
+			name = nname;
 		}
+		evbuffer_add_printf(evb, "}");
+		http_post_evbuffer(evb);
+		evbuffer_free(evb);
 	}
 
 	SVAR(frogchar, "@");
