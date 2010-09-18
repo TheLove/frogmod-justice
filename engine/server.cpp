@@ -130,7 +130,7 @@ void voutf(int v, const char *fmt, va_list args)
 
 	color_sauer2console(sf, sp);
 	if(!(v & OUT_NOCONSOLE)) {
-		puts(sp);
+		puts(sp); fflush(stdout);
 		if(httpoutbuf) {
 			evbuffer_add_vprintf(httpoutbuf, fmt, args);
 			evbuffer_add_printf(httpoutbuf, "\n");
@@ -997,7 +997,7 @@ void initserver(bool listen, bool dedicated)
 	ircinit();
 
     if(dedicated) execfile("server-init.cfg", false);
-    
+
     execfile("stdlib.cfg");
 
     if(listen) setuplistenserver(dedicated);
