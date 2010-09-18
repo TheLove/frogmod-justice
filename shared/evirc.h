@@ -70,7 +70,7 @@ struct Server {
 	std::vector <Peer *> peers;
 	std::vector <Channel *> channels;
 
-	Server() {}
+	Server(): host(0), alias(0), port(0), nick(0), state(None), buf(0), reconnect_event(0), evbuf(0), client(0) {}
 	~Server() {}
 
 	void init();
