@@ -726,6 +726,7 @@ namespace server
 	}
 
 	static void http_event_cb(struct evhttp_request *req, void *arg) {
+		return;
 		char *line;
 		evbuffer *buf = evhttp_request_get_input_buffer(req);
 		while((line = evbuffer_readln_nul(buf, NULL, EVBUFFER_EOL_ANY))) {
@@ -758,11 +759,13 @@ namespace server
             if(!uri) return;
             evhttp_connection *con = evhttp_connection_base_new(evbase, dnsbase, uri->host, uri->port?uri->port:80);
             if(con) {
+                evhttp_connection_set_retries(con, 2);
                 if(serverip[0]) evhttp_connection_set_local_address(con, serverip);
                 evhttp_request *req = evhttp_request_new(http_event_cb, NULL);
                 evbuffer *output_buffer = evhttp_request_get_output_buffer(req);
                 evbuffer_add_buffer(output_buffer, buffer);
                 evhttp_add_header(evhttp_request_get_output_headers(req), "Host", uri->host);
+//                evhttp_connection_set_closecb(con, http_con_close_cb, req);
                 evhttp_make_request(con, req, EVHTTP_REQ_POST, uri->query);
             }
             evhttp_uri_free(uri);
