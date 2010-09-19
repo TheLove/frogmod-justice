@@ -481,7 +481,7 @@ namespace server
 	}
 
 	/*****************************
-	 *  HTTP
+	 *  HTTP Server
 	 *****************************/
 
 	VAR(httpport, 0, 0, 65535);
@@ -725,6 +725,22 @@ namespace server
 		evhttp_set_gencb(http, httpgencb, NULL);
 	}
 
+
+	/*****************************
+	 *  HTTP Client
+	 *****************************/
+
+	SVAR(httphook, "");
+	enum {
+		HOOKFLAG_NOCONNECT = 1,
+		HOOKFLAG_NODISCONNECT = 2,
+		HOOKFLAG_NOKILL = 4,
+		HOOKFLAG_NOKICK = 8,
+		HOOKFLAG_NOSUICIDE = 16,
+		HOOKFLAG_NOINTERMISSION = 32
+	};
+	VAR(httphook_flags, 0, HOOKFLAG_NOKILL, 65535);
+
 	static void http_event_cb(struct evhttp_request *req, void *arg) {
 		char *line;
 		evbuffer *buf = evhttp_request_get_input_buffer(req);
@@ -734,42 +750,31 @@ namespace server
 		}
 	}
 
-	enum {
-		HOOKFLAG_NOCONNECT = 1,
-		HOOKFLAG_NODISCONNECT = 2,
-		HOOKFLAG_NOKILL = 4,
-		HOOKFLAG_NOKICK = 8,
-		HOOKFLAG_NOSUICIDE = 16,
-		HOOKFLAG_NOINTERMISSION = 32
-	};
-
-	SVAR(httphook, "");
-	VAR(httphook_flags, 0, 4, 65535);
-
-	int http_hook_has_flag(int flag)
-	{
+	int http_hook_has_flag(int flag) {
 		return httphook_flags & flag;
 	}
 
-	void http_post_evbuffer(evbuffer *buffer)
-	{
+	evhttp_connection *httpcon = NULL; // global variable - we reuse the connection
+	void http_con_close_cb(evhttp_connection *con, void *arg) {
+		evhttp_connection_free(con); // is this needed?
+		httpcon = NULL; // just mark it as closed and reopen when needed
+	}
+
+	void http_post_evbuffer(evbuffer *buffer) {
 		if(httphook[0]) {
 			evhttp_uri *uri = evhttp_uri_parse(httphook);
 			if(!uri) return;
-			evhttp_connection *con = evhttp_connection_base_new(evbase, dnsbase, uri->host, uri->port?uri->port:80);
-			if(con) {
-				evhttp_connection_set_retries(con, 2);
-				if(serverip[0]) evhttp_connection_set_local_address(con, serverip);
+			if(!httpcon) httpcon = evhttp_connection_base_new(evbase, dnsbase, uri->host, uri->port?uri->port:80);
+			if(httpcon) {
+				evhttp_connection_set_closecb(httpcon, http_con_close_cb, NULL);
+				evhttp_connection_set_retries(httpcon, 2);
+				if(serverip[0]) evhttp_connection_set_local_address(httpcon, serverip);
 				evhttp_request *req = evhttp_request_new(http_event_cb, NULL);
-				evbuffer *output_buffer = evhttp_request_get_output_buffer(req);
-				evbuffer_add_buffer(output_buffer, buffer);
+				evbuffer_add_buffer(evhttp_request_get_output_buffer(req), buffer);
 				evhttp_add_header(evhttp_request_get_output_headers(req), "Host", uri->host);
-//                evhttp_connection_set_closecb(con, http_con_close_cb, req);
-				evhttp_make_request(con, req, EVHTTP_REQ_POST, uri->query);
+				evhttp_make_request(httpcon, req, EVHTTP_REQ_POST, uri->query);
 			}
 			evhttp_uri_free(uri);
-
-			delete[] str;
 		}
 	}
 
