@@ -540,7 +540,6 @@ namespace server
 				case '\t': evbuffer_add_printf(buf, "\\t"); break;
 				case '/': evbuffer_add_printf(buf, "\\/"); break;
 				case '"':  evbuffer_add_printf(buf, "\\\""); break;
-				case '\'':  evbuffer_add_printf(buf, "\\'"); break;
 				case '\\': evbuffer_add_printf(buf, "\\\\"); break;
 				default: evbuffer_add_printf(buf, "%c", *c); break;
 			}
