@@ -10,7 +10,6 @@ static event pongsock_input_event;
 static event lansock_input_event;
 static event update_event;
 static event netstats_event;
-//static event stdin_event;
 IRC::Client irc;
 evbuffer *httpoutbuf = NULL;
 #ifdef HAVE_GEOIP
@@ -862,6 +861,31 @@ static void serverinfo_input(int fd, short e, void *arg) {
 	server::serverinforeply(req, p);
 }
 
+static bufferevent *stdinbuf;
+static void stdinreadcb(struct bufferevent *buf, void *arg) {
+	char *ln;
+	while((ln = evbuffer_readln(bufferevent_get_input(buf), NULL, EVBUFFER_EOL_ANY))) {
+		execute(ln);
+		free(ln);
+	}
+}
+static void stdinwritecb(struct bufferevent *buf, void *arg) {
+}
+void initconsole();
+static void stdineventcb(struct bufferevent *buf, short what, void *arg) {
+	if(what & BEV_EVENT_EOF) {
+		printf("EOF ignored. Press CTRL+C or CTRL+\\ to exit.\n");
+		initconsole();
+	}
+}
+void initconsole() {
+	if(stdinbuf) DEBUGF(bufferevent_free(stdinbuf))
+	else printf("Console initialized. You may type commands now.\n");
+	DEBUGF(stdinbuf = bufferevent_socket_new(evbase, 0, (bufferevent_options)0));
+	DEBUGF(bufferevent_enable(stdinbuf, EV_READ));
+	DEBUGF(bufferevent_setcb(stdinbuf, stdinreadcb, stdinwritecb, stdineventcb, NULL));
+}
+
 static void netstats_event_handler(int, short, void *) {
 	if(nonlocalclients || serverhost->totalSentData || serverhost->totalReceivedData) printf("status: %d remote clients, %.1f send, %.1f rec (K/sec)\n", nonlocalclients, serverhost->totalSentData/60.0f/1024, serverhost->totalReceivedData/60.0f/1024);
 	serverhost->totalSentData = serverhost->totalReceivedData = 0;
@@ -994,6 +1018,7 @@ void initserver(bool listen, bool dedicated)
 	geoip = GeoIP_new(GEOIP_STANDARD);
 #endif
 	evinit();
+	initconsole();
 	ircinit();
 
     if(dedicated) execfile("server-init.cfg", false);

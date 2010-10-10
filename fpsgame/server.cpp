@@ -2712,8 +2712,9 @@ namespace server
 	clientinfo *scriptclient;
 	ICOMMAND(echo, "C", (char *s), {
 		if(httpoutbuf) evbuffer_add_printf(httpoutbuf, "%s", s);
-		if(scriptclient) whisper(scriptclient->clientnum, "%s", s);
-		if(scriptircsource) scriptircsource->reply("%s", s);
+		else if(scriptclient) whisper(scriptclient->clientnum, "%s", s);
+		else if(scriptircsource) scriptircsource->reply("%s", s);
+		else printf("%s\n", s);
 	});
 
 	struct allowedcommand {
