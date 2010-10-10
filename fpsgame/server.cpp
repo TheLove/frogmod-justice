@@ -756,7 +756,6 @@ namespace server
 
 	evhttp_connection *httpcon = NULL; // global variable - we reuse the connection
 	void http_con_close_cb(evhttp_connection *con, void *arg) {
-		evhttp_connection_free(con); // is this needed?
 		httpcon = NULL; // just mark it as closed and reopen when needed
 	}
 
