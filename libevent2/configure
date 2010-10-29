@@ -3123,7 +3123,7 @@ fi
 
 # Define the identity of the package.
  PACKAGE=libevent
- VERSION=2.0.7-rc
+ VERSION=2.0.8-rc
 
 
 cat >>confdefs.h <<_ACEOF
@@ -3166,7 +3166,7 @@ am__tar='${AMTAR} chof - "$$tardir"'; am__untar='${AMTAR} xf -'
 ac_config_headers="$ac_config_headers config.h"
 
 
-$as_echo "#define NUMERIC_VERSION 0x02000700" >>confdefs.h
+$as_echo "#define NUMERIC_VERSION 0x02000800" >>confdefs.h
 
 
 if test "$prefix" = "NONE"; then
@@ -13504,7 +13504,7 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
   CFLAGS="$CFLAGS -W -Wfloat-equal -Wundef -Wpointer-arith -Wstrict-prototypes -Wmissing-prototypes -Wwrite-strings -Wredundant-decls -Wchar-subscripts -Wcomment -Wformat -Wwrite-strings -Wmissing-declarations -Wredundant-decls -Wnested-externs -Wbad-function-cast -Wswitch-enum -Werror"
-  CFLAGS="$CFLAGS -Wno-unused-parameter -Wno-sign-compare -Wstrict-aliasing"
+  CFLAGS="$CFLAGS -Wno-unused-parameter -Wstrict-aliasing"
 
   if test x$have_gcc4 = xyes ; then
     # These warnings break gcc 3.3.5 and work on gcc 4.0.2
