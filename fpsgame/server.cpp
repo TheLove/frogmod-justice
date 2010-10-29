@@ -356,7 +356,8 @@ namespace server
 	struct ban
 	{
 		int time;
-		uint ip;
+		string pattern;
+		string name;
 	};
 
 	namespace aiman
@@ -596,7 +597,8 @@ namespace server
 		evbuffer_add_printf(buf, "\": ");
 		evbuffer_add_printf(buf, "{");
 		evbuffer_add_json_prop(buf, "name", ci->name);
-		evbuffer_add_json_prop(buf, "ip", getclienthostname(ci->clientnum));
+		evbuffer_add_json_prop(buf, "ip", getclientipstr(ci->clientnum));
+		evbuffer_add_json_prop(buf, "hostname", getclienthostname(ci->clientnum));
 		evbuffer_add_json_prop(buf, "skill", ci->state.skill, false);
 		evbuffer_add_printf(buf, "}%s", comma ? "," : "");
 	}
@@ -605,7 +607,8 @@ namespace server
 	void evbuffer_add_json_player(evbuffer *buf, clientinfo *ci, bool country, bool comma = true) {
 		evbuffer_add_printf(buf, "{");
 		evbuffer_add_json_prop(buf, "name", ci->name);
-		evbuffer_add_json_prop(buf, "ip", getclienthostname(ci->clientnum));
+		evbuffer_add_json_prop(buf, "ip", getclientipstr(ci->clientnum));
+		evbuffer_add_json_prop(buf, "hostname", getclienthostname(ci->clientnum));
 #ifdef HAVE_GEOIP
 		if(country) evbuffer_add_json_prop(buf, "country", getclientcountrynul(ci->clientnum));
 #endif
@@ -899,6 +902,11 @@ namespace server
 		evbuffer_add_printf(evb, "}");
 		http_post_evbuffer(evb);
 		evbuffer_free(evb);
+	}
+
+	void gothostname(void *info) {
+		clientinfo *ci = (clientinfo *)info;
+		loopv(bannedips) if(!fnmatch(bannedips[i].pattern, getclienthostname(ci->clientnum), 0)) { disconnect_client(ci->clientnum, DISC_IPBAN); return; }
 	}
 
 	SVAR(frogchar, "@");
@@ -2620,6 +2628,7 @@ namespace server
 		clientinfo *ci = (clientinfo *)getclientinfo(*cn);
 		result(ci ? ci->team : "");
 	});
+	ICOMMAND(getclientip, "i", (int *cn), result(getclientipstr(*cn)));
 	ICOMMAND(getclienthostname, "i", (int *cn), result(getclienthostname(*cn)));
 #ifdef HAVE_GEOIP
 	ICOMMAND(getclientcountry, "i", (int *cn), result(getclientcountry(*cn)));

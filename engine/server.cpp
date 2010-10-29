@@ -311,7 +311,7 @@ struct client                   // server side version of "dynent" type
     int type;
     int num;
     ENetPeer *peer;
-    string hostname;
+    string ip, hostname;
 #ifdef HAVE_GEOIP
     string country;
 #endif
@@ -341,6 +341,7 @@ void *getclientinfo(int i) { return !clients.inrange(i) || clients[i]->type==ST_
 ENetPeer *getclientpeer(int i) { return clients.inrange(i) && clients[i]->type==ST_TCPIP ? clients[i]->peer : NULL; }
 int getnumclients()        { return clients.length(); }
 uint getclientip(int n)    { return clients.inrange(n) && clients[n]->type==ST_TCPIP ? clients[n]->peer->address.host : 0; }
+const char *getclientipstr(int n) { return clients.inrange(n) && clients[n]->type==ST_TCPIP ? clients[n]->ip : 0; }
 const char *getclienthostname(int n) { return clients.inrange(n) && clients[n]->type==ST_TCPIP ? clients[n]->hostname : 0; }
 #ifdef HAVE_GEOIP
 const char *getclientcountrynul(int n) {
@@ -471,7 +472,7 @@ void disconnect_client(int n, int reason)
     clients[n]->peer->data = NULL;
     server::deleteclientinfo(clients[n]->info);
     clients[n]->info = NULL;
-    outf(2, "Client (%s) disconnected because: \f3%s", clients[n]->hostname, disc_reasons[reason]);
+    outf(2, "Client (%s) disconnected because: \f3%s", clients[n]->ip, disc_reasons[reason]);
 }
 
 void kicknonlocalclients(int reason)
@@ -518,7 +519,7 @@ bool resolverwait(const char *name, ENetAddress *address)
     return enet_address_set_host(address, name) >= 0;
 }
 
-int connectwithtimeout(ENetSocket sock, const char *hostname, const ENetAddress &remoteaddress)
+int connectwithtimeout(ENetSocket sock, const char *ip, const ENetAddress &remoteaddress)
 {
     int result = enet_socket_connect(sock, &remoteaddress);
     if(result<0) enet_socket_destroy(sock);
@@ -735,6 +736,20 @@ void updatemasterserver()
 }
 COMMAND(updatemasterserver, "");
 
+void rdnscb(int result, char type, int count, int ttl, void *addresses, void *arg) {
+	unsigned long ip = (unsigned long)arg;
+	if(result == DNS_ERR_NONE) {
+		if(type == DNS_PTR && count >= 1) {
+			for(int i = clients.length() - 1; i >= 0; i--) {
+				if(clients[i]->type == ST_TCPIP && clients[i]->peer->address.host == ip) {
+					copystring(clients[i]->hostname, ((char **)addresses)[0]);
+					server::gothostname(clients[i]->info);
+				}
+			}
+		}
+	}
+}
+
 void serverhost_process_event(ENetEvent & event) {
     switch(event.type)
     {
@@ -745,15 +760,17 @@ void serverhost_process_event(ENetEvent & event) {
             c.peer = event.peer;
             c.peer->data = &c;
             char hn[1024];
-            copystring(c.hostname, (enet_address_get_host_ip(&c.peer->address, hn, sizeof(hn))==0) ? hn : "unknown");
+            copystring(c.ip, (enet_address_get_host_ip(&c.peer->address, hn, sizeof(hn))==0) ? hn : "unknown");
 #ifdef HAVE_GEOIP
 			const char *country = GeoIP_country_name_by_ipnum(geoip, endianswap32(c.peer->address.host));
 			if(country) copystring(c.country, country);
 			else c.country[0] = 0;
-			printf("client connected (%s/%s)\n", c.hostname, c.country);
+			printf("client connected (%s/%s)\n", c.ip, c.country);
 #else
-            printf("client connected (%s)\n", c.hostname);
+            printf("client connected (%s)\n", c.ip);
 #endif
+			c.hostname[0] = 0;
+			evdns_base_resolve_reverse(dnsbase, (in_addr *)&c.peer->address.host, 0, rdnscb, (void *)c.peer->address.host);
             int reason = server::clientconnect(c.num, c.peer->address.host);
             if(!reason) nonlocalclients++;
             else disconnect_client(c.num, reason);
@@ -770,7 +787,7 @@ void serverhost_process_event(ENetEvent & event) {
         {
             client *c = (client *)event.peer->data;
             if(!c) break;
-            printf("disconnected client (%s)\n", c->hostname);
+            printf("disconnected client (%s)\n", c->ip);
             server::clientdisconnect(c->num);
             nonlocalclients--;
             c->type = ST_EMPTY;
@@ -811,7 +828,7 @@ void localconnect()
 {
     client &c = addclient();
     c.type = ST_LOCAL;
-    copystring(c.hostname, "local");
+    copystring(c.ip, "local");
     localclients++;
     game::gameconnect(false);
     server::localconnect(c.num);
