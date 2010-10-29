@@ -345,6 +345,7 @@ extern void sendpacket(int cn, int chan, ENetPacket *packet, int exclude = -1);
 extern void flushserver(bool force);
 extern int getnumclients();
 extern uint getclientip(int n);
+extern const char * getclientipstr(int n);
 extern const char * getclienthostname(int n);
 #ifdef HAVE_GEOIP
 extern const char *getclientcountrynul(int n); // returns "" if country is not found

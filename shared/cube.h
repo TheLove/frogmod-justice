@@ -28,6 +28,7 @@
 #include <new.h>
 #endif
 #include <time.h>
+#include <fnmatch.h>
 
 #include <sys/queue.h>
 #include <event.h>

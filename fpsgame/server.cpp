@@ -2476,7 +2476,11 @@ namespace server
 		if(adminpass[0] && checkpassword(ci, adminpass, pwd)) return DISC_NONE;
 		if(numclients(-1, false, true)>=maxclients) return DISC_MAXCLIENTS;
 		uint ip = getclientip(ci->clientnum);
-		loopv(bannedips) if(bannedips[i].ip==ip) return DISC_IPBAN;
+		const char *ipstr = getclientipstr(ci->clientnum);
+		loopv(bannedips) {
+			printf("comparing [%s] with [%s]\n", bannedips[i].pattern, ipstr);
+			if(!fnmatch(bannedips[i].pattern, ipstr, 0)) return DISC_IPBAN;
+		}
 		if(checkgban(ip)) return DISC_IPBAN;
 		if(mastermode>=MM_PRIVATE && allowedips.find(ip)<0) return DISC_PRIVATE;
 		return DISC_NONE;
@@ -2668,10 +2672,10 @@ namespace server
 		if(ci) { // no bots
 			ban &b = bannedips.add();
 			b.time = totalmillis;
-			b.ip = getclientip(victim);
-			allowedips.removeobj(b.ip);
+			b.pattern[0] = 0;
+			copystring(b.pattern, getclientipstr(victim));
+			allowedips.removeobj(getclientip(victim));
 			defformatstring(mil)("%d", totalmillis - ci->connectmillis);
-			//http_post_event("action", "kick", "name", ci->name, "ip", getclienthostname(victim), "millis", mil, "kicker", m?m->name:"", "kicker_ip", m?getclienthostname(m->clientnum):"", NULL);
 			http_post_event_kick(m, ci);
 			disconnect_client(victim, DISC_KICK);
 		}
