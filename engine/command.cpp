@@ -727,7 +727,6 @@ bool execfile(const char *cfgfile, bool msg)
     return true;
 }
 
-#ifndef STANDALONE
 static int sortidents(ident **x, ident **y)
 {
     return strcmp((*x)->name, (*y)->name);
@@ -750,11 +749,12 @@ void writeescapedstring(stream *f, const char *s)
 void writecfg(const char *name)
 {
     stream *f = openfile(path(name && name[0] ? name : game::savedconfig(), true), "w");
+	printf("writing cfg %s\n", path(name && name[0] ? name : game::savedconfig(), true));
     if(!f) return;
-    f->printf("// automatically written on exit, DO NOT MODIFY\n// delete this file to have %s overwrite these settings\n// modify settings in game, or put settings in %s to override anything\n\n", game::defaultconfig(), game::autoexec());
+    f->printf("// automatically written on exit, DO NOT MODIFY\n// delete this file to have %s overwrite these settings\n\n", game::defaultconfig());
     game::writeclientinfo(f);
     f->printf("\n");
-    writecrosshairs(f);
+//    writecrosshairs(f);
     vector<ident *> ids;
     enumerate(*idents, ident, id, ids.add(&id));
     ids.sort(sortidents);
@@ -769,8 +769,8 @@ void writecfg(const char *name)
         }
     }
     f->printf("\n");
-    writebinds(f);
-    f->printf("\n");
+//    writebinds(f);
+//    f->printf("\n");
     loopv(ids)
     {
         ident &id = *ids[i];
@@ -780,12 +780,11 @@ void writecfg(const char *name)
         }
     }
     f->printf("\n");
-    writecompletions(f);
+//    writecompletions(f);
     delete f;
 }
 
 COMMAND(writecfg, "s");
-#endif
 
 // below the commands that implement a small imperative language. thanks to the semantics of
 // () and [] expressions, any control construct can be defined trivially.

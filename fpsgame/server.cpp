@@ -11,6 +11,17 @@ namespace game
 			if(!server::serveroption(args[i]))
 				conoutf(CON_ERROR, "unknown command-line option: %s", args[i]);
 	}
+
+	const char *savedconfig() {
+		return "config.cfg";
+	}
+
+	const char *defaultconfig() {
+		return "server-init.cfg";
+	}
+
+	void writeclientinfo(stream *f) {
+	}
 }
 
 extern ENetAddress masteraddress;
