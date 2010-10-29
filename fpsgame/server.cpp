@@ -741,6 +741,10 @@ namespace server
 	VAR(httphook_flags, 0, HOOKFLAG_NOKILL, 65535);
 
 	static void http_event_cb(struct evhttp_request *req, void *arg) {
+		if(!req) {
+			printf("HTTP request failed.\n");
+			return;
+		}
 		char *line;
 		evbuffer *buf = evhttp_request_get_input_buffer(req);
 		while((line = evbuffer_readln_nul(buf, NULL, EVBUFFER_EOL_ANY))) {
