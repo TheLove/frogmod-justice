@@ -218,6 +218,8 @@ namespace server
 
 	extern int gamemillis, nextexceeded;
 
+	VAR(kickmillis, 0, 5000, 65535); // number of milliseconds between two consecutive kicks
+	VAR(maxkicks, 0, 2, 128); // number of kicks within kickmillis interval that will trigger mass kick protection
 	struct clientinfo
 	{
 		int clientnum, ownernum, connectmillis, sessionid, overflow;
@@ -240,6 +242,8 @@ namespace server
 		bool warned, gameclip;
 		ENetPacket *clipboard;
 		int lastclipboard, needclipboard;
+		// mass kick protection:
+		int lastkickmillis, nkicks; // last kick timestamp, number of kicks attempts since then
 
 		clientinfo() : clipboard(NULL) { reset(); }
 		~clientinfo() { events.deletecontents(); cleanclipboard(); }
@@ -305,6 +309,8 @@ namespace server
 			mapcrc = 0;
 			warned = false;
 			gameclip = false;
+			lastkickmillis = 0;
+			nkicks = 0;
 		}
 
 		void reassign()
@@ -2554,7 +2560,7 @@ namespace server
 		writecfg();
 	});
 
-	ICOMMAND(blacklist, "ss", (char *p, char *r), {
+	void addblacklist(char *p, char *r) {
 		if(p && *p) {
 			black_ip &b = blacklistips.add();
 			copystring(b.pattern, p);
@@ -2563,6 +2569,9 @@ namespace server
 			writecfg();
 			outf(2, "Added to blacklist: %s (%s)", p, r?r:"");
 		}
+	}
+	ICOMMAND(blacklist, "ss", (char *p, char *r), {
+		addblacklist(p, r);
 	});
 	ICOMMAND(unblacklist, "s", (char *p, char *r), {
 	    if(p && *p) loopv(blacklistips) {
@@ -2783,14 +2792,25 @@ namespace server
 
 	void kick_client(int victim, clientinfo *m) {
 		clientinfo *ci = (clientinfo *)getclientinfo(victim);
+		if(m) {
+			if(m->lastkickmillis && totalmillis - m->lastkickmillis <= kickmillis) {
+				m->nkicks++;
+				if(m->nkicks >= maxkicks) {
+					addblacklist((char *)getclientipstr(m->clientnum), (char *)"Mass kicking (automatically added).");
+					kick_client(m->clientnum, NULL);
+				} else outf(2, "\f3Kick protection triggered. Kick denied.");
+				m->lastkickmillis = totalmillis;
+				return;
+			} else m->nkicks = 0;
+			m->lastkickmillis = totalmillis;
+		}
 		if(ci) { // no bots
 			ban &b = bannedips.add();
 			b.time = totalmillis;
 			b.pattern[0] = 0;
 			copystring(b.pattern, getclientipstr(victim));
 			allowedips.removeobj(getclientip(victim));
-			defformatstring(mil)("%d", totalmillis - ci->connectmillis);
-			http_post_event_kick(m, ci);
+			if(m) http_post_event_kick(m, ci);
 			disconnect_client(victim, DISC_KICK);
 		}
 	}
