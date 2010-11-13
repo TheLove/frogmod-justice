@@ -5,6 +5,7 @@ config.mk
 core.*
 
 server-init.cfg
+config.cfg
 
 engine/*.[Po]
 shared/*.[Po]
