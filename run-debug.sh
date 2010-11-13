@@ -20,4 +20,5 @@ EOF
 
 echo 'Crash email sent'
 fi
+sleep 1
 done
