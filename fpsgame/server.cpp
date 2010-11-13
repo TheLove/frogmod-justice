@@ -225,7 +225,7 @@ namespace server
 		int playermodel;
 		int modevote;
 		int privilege;
-		bool connected, local, timesync;
+		bool connected, local, timesync, logged_in;
 		int gameoffset, lastevent, pushed, exceeded;
 		gamestate state;
 		vector<gameevent *> events;
@@ -333,6 +333,7 @@ namespace server
 			ping = 0;
 			aireinit = 0;
 			needclipboard = 0;
+			logged_in = false;
 			cleanclipboard();
 			mapchange();
 		}
@@ -917,9 +918,24 @@ namespace server
 		loopv(bannedips) if(!fnmatch(bannedips[i].pattern, getclienthostname(ci->clientnum), 0)) { disconnect_client(ci->clientnum, DISC_IPBAN); return; }
 	}
 
+	clientinfo *scriptclient;
+	IRC::Source *scriptircsource = NULL;
+	const char *colorname(clientinfo *ci, char *name = NULL);
+	ICOMMAND(login, "s", (char *s), {
+		if(s && *s && *adminpass && !strcmp(s, adminpass)) {
+			if(scriptircsource) {
+				scriptircsource->peer->data[0] = 1; // flag as logged in
+				outf(2, "%s logged in", scriptircsource->peer->nick);
+			}
+			if(scriptclient) {
+				scriptclient->logged_in = true;
+				outf(2, "%s logged in", colorname(scriptclient));
+			}
+		}
+	});
+
 	SVAR(frogchar, "@");
 	void processcommand(char *txt, int privilege = 0);
-	IRC::Source *scriptircsource = NULL;
 	void ircmsgcb(IRC::Source *source, char *msg) {
 		if(NULL == strchr(frogchar, *msg)) {
 			string buf;
@@ -927,9 +943,17 @@ namespace server
 			outf(1 | OUT_NOIRC, "\f4%s \f2<%s> \f7%s", source->channel?source->channel->alias:"", source->peer->nick, buf);
 		} else {
 			scriptircsource = source;
-			processcommand(msg+1);
+			if(source && source->peer && source->peer->data[0]) execute(msg+1);
+			else processcommand(msg+1);
 			scriptircsource = NULL;
 		}
+	}
+
+	void ircprivcb(IRC::Source *source, char *msg) {
+		scriptircsource = source;
+		if(source && source->peer && source->peer->data[1]) execute(msg);
+		else processcommand(msg);
+		scriptircsource = NULL;
 	}
 
 	void ircactioncb(IRC::Source *source, char *msg) {
@@ -972,7 +996,7 @@ namespace server
 
 	void ircinit() {
 		irc.channel_message_cb        = ircmsgcb;
-		irc.private_message_cb        = NULL; // ignore
+		irc.private_message_cb        = ircprivcb;
 		irc.channel_action_message_cb = ircactioncb;
 		irc.private_action_message_cb = NULL;
 		irc.notice_cb                 = ircnoticecb;
@@ -1011,7 +1035,7 @@ namespace server
 		return false;
 	}
 
-	const char *colorname(clientinfo *ci, char *name = NULL)
+	const char *colorname(clientinfo *ci, char *name)
 	{
 		if(!name) name = ci->name;
 		if(name[0] && !duplicatename(ci, name) && ci->state.aitype == AI_NONE) return name;
@@ -2827,7 +2851,6 @@ namespace server
 		sendf(cn, 1, "ris", N_SERVMSG, str);
 	}
 
-	clientinfo *scriptclient;
 	ICOMMAND(echo, "C", (char *s), {
 		if(httpoutbuf) evbuffer_add_printf(httpoutbuf, "%s", s);
 		else if(scriptclient) whisper(scriptclient->clientnum, "%s", s);
@@ -2930,7 +2953,7 @@ namespace server
 			return true;
 		}
 		scriptclient = ci;
-		processcommand(text+1, ci->privilege);
+		processcommand(text+1, ci->logged_in?PRIV_ADMIN:ci->privilege);
 		scriptclient = NULL;
 		return false;
 	}
@@ -2943,7 +2966,6 @@ namespace server
 			char *ns = s;
 			while(*ns && !isspace(*ns)) ns++;
 			while(isspace(*ns)) ns++;
-			printf("whispering %s %s", scriptclient ? scriptclient->name : scriptircsource->peer->nick, ns);
 			whisper(*cn, "%s whispers: %s", scriptclient ? scriptclient->name : scriptircsource->peer->nick, ns);
 		}
 	});

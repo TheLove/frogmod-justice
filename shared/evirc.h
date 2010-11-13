@@ -27,10 +27,8 @@ struct Peer {
 		else nick = NULL;
 	}
 
-	Peer(): nick(0), count(0) { data[0] = 0; }
-	~Peer() {
-		if(nick) free(nick);
-	}
+	Peer(): nick(0), count(0) { memset(data, 0, 512); }
+	~Peer() { if(nick) free(nick); }
 };
 
 struct ChannelPeer {
@@ -118,7 +116,7 @@ struct Server {
 struct Source {
 	Server *server;
 	Client *client;
-	Peer *peer; //FIXME: replace with Peer *
+	Peer *peer;
 	Channel *channel;
 
 	void reply(const char *fmt, ...); // on channels it replies with "nick: message". in privmsg it replies with "message"
