@@ -2505,7 +2505,6 @@ namespace server
 		uint ip = getclientip(ci->clientnum);
 		const char *ipstr = getclientipstr(ci->clientnum);
 		loopv(bannedips) {
-			printf("comparing [%s] with [%s]\n", bannedips[i].pattern, ipstr);
 			if(!fnmatch(bannedips[i].pattern, ipstr, 0)) return DISC_IPBAN;
 		}
 		if(checkgban(ip)) return DISC_IPBAN;
