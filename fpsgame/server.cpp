@@ -2473,24 +2473,44 @@ namespace server
 		}
 	}
 
+	void addban(char *pattern, char *name, bool perm=false) {
+		ban &b = bannedips.add();
+		copystring(b.pattern, pattern);
+		if(name) copystring(b.name, name);
+		else b.name[0] = 0;
+		b.time = perm?-1:totalmillis;
+	}
+
 	ICOMMAND(pban, "ss", (char *h, char *n), {
 		if(h) {
-			ban &b = bannedips.add();
-			copystring(b.pattern, h);
-			if(n) copystring(b.name, n);
-			else b.name[0] = 0;
-			b.time = -1;
+			addban(h, n, true);
+			outf(2, "Added permanent ban [%s] (%s)", h, n?n:"");
 			writecfg();
 		}
 	});
 
+	ICOMMAND(ban, "ss", (char *h, char *n), {
+	    if(h) addban(h, n);
+	});
+
 	void writepbans(stream *f) {
-		loopv(bannedips) {
-			if(bannedips[i].time == -1) {
+	    loopv(bannedips) {
+		    if(bannedips[i].time == -1) {
 				f->printf("pban [%s] [%s]\n", bannedips[i].pattern, bannedips[i].name);
-			}
-		}
+		    }
+	    }
 	}
+
+	ICOMMAND(unban, "s", (char *s), {
+		bool any = false;
+	    if(s && *s) loopv(bannedips) {
+			if(!strcmp(bannedips[i].pattern, s)) {
+				if(!any) outf(2, "Ban %s (%s) was removed.", bannedips[i].pattern, bannedips[i].name);
+				bannedips.remove(i); i--;
+				any = true;
+			}
+	    }
+	});
 
 	int allowconnect(clientinfo *ci, const char *pwd)
 	{
