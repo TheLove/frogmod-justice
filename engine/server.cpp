@@ -1042,6 +1042,8 @@ void initserver(bool listen, bool dedicated)
 
     execfile("stdlib.cfg");
 
+    execfile(game::savedconfig());
+
     if(listen) setuplistenserver(dedicated);
 
     server::serverinit();
