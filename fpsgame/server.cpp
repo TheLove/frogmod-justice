@@ -22,6 +22,7 @@ namespace game
 
 	void writeclientinfo(stream *f) {
 		server::writepbans(f);
+		server::writeblacklist(f);
 	}
 }
 
@@ -360,6 +361,11 @@ namespace server
 		string pattern;
 		string name;
 	};
+	
+	struct black_ip {
+		string pattern;
+		string reason;
+	};
 
 	namespace aiman
 	{
@@ -396,6 +402,7 @@ namespace server
 
 	vector<uint> allowedips;
 	vector<ban> bannedips;
+	vector<black_ip> blacklistips;
 	vector<clientinfo *> connects, clients, bots;
 	vector<worldstate *> worldstates;
 	bool reliablemessages = false;
@@ -1416,52 +1423,64 @@ namespace server
 		if(ci->state.state==CS_SPECTATOR && !ci->local) aiman::removeai(ci);
 	}
 
+	bool checkblacklist(clientinfo *ci) {
+		loopv(blacklistips) {
+			printf("checking %s against [%s] [%s] [%s]\n", blacklistips[i].pattern, ci->name, getclienthostname(ci->clientnum), getclientipstr(ci->clientnum));
+			if(!fnmatch(blacklistips[i].pattern, ci->name, 0) ||
+			   !fnmatch(blacklistips[i].pattern, getclienthostname(ci->clientnum), 0) ||
+			   !fnmatch(blacklistips[i].pattern, getclientipstr(ci->clientnum), 0)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	void setmaster(clientinfo *ci, bool val, const char *pass, const char *authname)
 	{
 		if(authname && !val) return;
 		const char *name = "";
-		if(val)
-		{
-			bool haspass = adminpass[0] && checkpassword(ci, adminpass, pass);
-			if(ci->privilege)
-			{
+		bool haspass = false;
+		if(val) {
+			haspass = adminpass[0] && checkpassword(ci, adminpass, pass);
+
+			if(ci->privilege) {
 				if(!adminpass[0] || haspass==(ci->privilege==PRIV_ADMIN)) return;
-			}
-			else if(ci->state.state==CS_SPECTATOR && !haspass && !authname && !ci->local) return;
-			loopv(clients) if(ci!=clients[i] && clients[i]->privilege)
-			{
+			} else if(ci->state.state==CS_SPECTATOR && !haspass && !authname && !ci->local) return;
+
+			loopv(clients) if(ci!=clients[i] && clients[i]->privilege) {
 				if(haspass) clients[i]->privilege = PRIV_NONE;
 				else if((authname || ci->local) && clients[i]->privilege<=PRIV_MASTER) continue;
 				else return;
 			}
+
 			if(haspass) ci->privilege = PRIV_ADMIN;
-			else if(!authname && !(mastermask&MM_AUTOAPPROVE) && !ci->privilege && !ci->local)
-			{
+			else if(!authname && !(mastermask&MM_AUTOAPPROVE) && !ci->privilege && !ci->local) {
 				sendf(ci->clientnum, 1, "ris", N_SERVMSG, "This server requires you to use the \"/auth\" command to gain master.");
 				return;
-			}
-			else
-			{
-				if(authname)
-				{
+			} else {
+				if(checkblacklist(ci)) {
+					outf(2, "\f2Blacklisted setmaster failed: %s", colorname(ci));
+					return;
+				}
+				if(authname) {
 					loopv(clients) if(ci!=clients[i] && clients[i]->privilege<=PRIV_MASTER) revokemaster(clients[i]);
 				}
 				ci->privilege = PRIV_MASTER;
 			}
+
 			name = privname(ci->privilege);
-		}
-		else
-		{
+		} else {
 			if(!ci->privilege) return;
 			name = privname(ci->privilege);
 			revokemaster(ci);
 		}
-		mastermode = MM_OPEN;
+		if(!haspass || !val) mastermode = MM_OPEN;
+
 		allowedips.shrink(0);
 		string msg;
-		if(val && authname) formatstring(msg)("%s claimed %s as '\fs\f5%s\fr'", colorname(ci), name, authname);
+		if(val && authname) formatstring(msg)("%s claimed %s as '\f5%s\f7'", colorname(ci), name, authname);
 		else formatstring(msg)("%s %s %s", colorname(ci), val ? "claimed" : "relinquished", name);
-		outf(2, msg);
+		outf(2, "%s. Mastermode is \f1%s\f7.", msg, mastermodename(mastermode));
 		currentmaster = val ? ci->clientnum : -1;
 		sendf(-1, 1, "ri4", N_CURRENTMASTER, currentmaster, currentmaster >= 0 ? ci->privilege : 0, mastermode);
 		if(gamepaused)
@@ -2502,15 +2521,39 @@ namespace server
 	}
 
 	ICOMMAND(unban, "s", (char *s), {
-		bool any = false;
 	    if(s && *s) loopv(bannedips) {
 			if(!strcmp(bannedips[i].pattern, s)) {
-				if(!any) outf(2, "Ban %s (%s) was removed.", bannedips[i].pattern, bannedips[i].name);
+				outf(2, "Ban %s (%s) was removed.", bannedips[i].pattern, bannedips[i].name);
 				bannedips.remove(i); i--;
-				any = true;
 			}
 	    }
+		writecfg();
 	});
+
+	ICOMMAND(blacklist, "ss", (char *p, char *r), {
+		if(p && *p) {
+			black_ip &b = blacklistips.add();
+			copystring(b.pattern, p);
+			if(r && *r) copystring(b.reason, r);
+			else b.reason[0] = 0;
+			writecfg();
+			outf(2, "Added to blacklist: %s (%s)", p, r?r:"");
+		}
+	});
+	ICOMMAND(unblacklist, "s", (char *p, char *r), {
+	    if(p && *p) loopv(blacklistips) {
+			if(!strcmp(blacklistips[i].pattern, p)) {
+				outf(2, "Blacklist %s (%s) was removed.", blacklistips[i].pattern, blacklistips[i].reason);
+				blacklistips.remove(i); i--;
+			}
+	    }
+		writecfg();
+	});
+	void writeblacklist(stream *f) {
+		loopv(blacklistips) {
+			f->printf("blacklist [%s] [%s]", blacklistips[i].pattern, blacklistips[i].reason);
+		}
+	}
 
 	int allowconnect(clientinfo *ci, const char *pwd)
 	{
