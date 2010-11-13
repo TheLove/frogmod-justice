@@ -22,7 +22,7 @@ if (isset($argv[1]) && $argv[1]) {
 <?
 }
 
-if (!$jsonString)
+if (!isset($jsonString) || !$jsonString)
     exit();
 
 /**
@@ -38,5 +38,5 @@ $jsonParser = new JSONParser();
 try {
     $jsonParser->parse($jsonString);
 } catch (Exception $e) {
-    die("Exception:" . $e->getMessage());
+    die("Exception: " . $e->getMessage());
 }
