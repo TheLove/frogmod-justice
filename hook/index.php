@@ -15,8 +15,11 @@ if (isset($argv[1]) && $argv[1]) {
     /**
      * HTTP Input
      */
-} else {
+} elseif($_SERVER['REQUEST_METHOD'] == 'POST') {
     $jsonString = trim(file_get_contents('php://input'));
+} else { ?>
+<h1>Frogmod hook</h1>
+<?
 }
 
 if (!$jsonString)
@@ -37,4 +40,3 @@ try {
 } catch (Exception $e) {
     die("Exception:" . $e->getMessage());
 }
-?>
