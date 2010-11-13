@@ -21,6 +21,7 @@ namespace game
 	}
 
 	void writeclientinfo(stream *f) {
+		server::writepbans(f);
 	}
 }
 
@@ -2267,7 +2268,7 @@ namespace server
 			if(smode) smode->update();
 		}
 
-		while(bannedips.length() && bannedips[0].time-totalmillis>4*60*60000) bannedips.remove(0);
+		loopv(bannedips) if(bannedips[i].time != -1 && bannedips[i].time-totalmillis>4*60*60000) { bannedips.remove(i); i--; }
 		loopv(connects) if(totalmillis-connects[i]->connectmillis>15000) disconnect_client(connects[i]->clientnum, DISC_TIMEOUT);
 
 		if(nextexceeded && gamemillis > nextexceeded && (!m_timed || gamemillis < gamelimit))
@@ -2461,6 +2462,25 @@ namespace server
 			clientinfo *ci = clients[i];
 			if(ci->local || ci->privilege >= PRIV_ADMIN) continue;
 			if(checkgban(getclientip(ci->clientnum))) disconnect_client(ci->clientnum, DISC_IPBAN);
+		}
+	}
+
+	ICOMMAND(pban, "ss", (char *h, char *n), {
+		if(h) {
+			ban &b = bannedips.add();
+			copystring(b.pattern, h);
+			if(n) copystring(b.name, n);
+			else b.name[0] = 0;
+			b.time = -1;
+			writecfg();
+		}
+	});
+
+	void writepbans(stream *f) {
+		loopv(bannedips) {
+			if(bannedips[i].time == -1) {
+				f->printf("pban [%s] [%s]\n", bannedips[i].pattern, bannedips[i].name);
+			}
 		}
 	}
 
@@ -2708,7 +2728,9 @@ namespace server
 	ICOMMAND(spectator, "ii", (int *v, int *s), { if(s && v) spectator(*v, *s); });
 
 	void clearbans() {
-		bannedips.shrink(0);
+		loopv(bannedips) {
+			if(bannedips[i].time != -1) { bannedips.remove(i); i--; }
+		}
 		outf(2, "All bans cleared.");
 	}
 	COMMAND(clearbans, "");

@@ -787,6 +787,7 @@ namespace server
     extern int msgsizelookup(int msg);
     extern bool serveroption(const char *arg);
     extern bool delayspawn(int type);
+    extern void writepbans(stream *f);
 }
 
 #endif
