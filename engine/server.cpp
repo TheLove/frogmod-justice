@@ -1029,6 +1029,31 @@ ICOMMAND(ircjoin, "ssiss", (const char *s, const char *c, const int *v, const ch
 ICOMMAND(ircpart, "ss", (const char *s, const char *c), {
 	if(s && *s && c && *c) irc.part(s, c);
 });
+
+bool enet_inited = false;
+void ircemptycb() {
+	printf("IRC client disconnected.\n");
+	printf("Exiting.\n");
+	exit(0);
+}
+
+VAR(ircquitsecs, 0, 1, 65535); // number of seconds to wait for an irc server to finish disconnecting, after the quit command is sent
+SVAR(ircquitmsg, "Frogserv shutting down.");
+void quitsig(int s) {
+	signal(SIGQUIT, SIG_DFL);
+	signal(SIGINT, SIG_DFL);
+	printf("\nShutting down. Press %s again to force...\n", s==SIGQUIT?"CTRL+\\":(s==SIGINT?"CTRL+C":"the same key"));
+	fflush(stdout);
+	printf("Deinitializing enet...\n");
+	if(enet_inited) enet_deinitialize();
+	writecfg();
+	if(irc.servers.size()) {
+		printf("Disconnecting IRC client...\n");
+		irc.empty_cb = ircemptycb;
+		irc.quit(ircquitmsg, ircquitsecs);
+	} else ircemptycb();
+}
+
 void initserver(bool listen, bool dedicated)
 {
 #ifdef HAVE_GEOIP
@@ -1105,14 +1130,14 @@ bool serveroption(char *opt)
 
 vector<const char *> gameargs;
 
-#ifdef STANDALONE
 int main(int argc, char* argv[]) {
+	signal(SIGINT, quitsig);
+	signal(SIGQUIT, quitsig);
     if(enet_initialize()<0) fatal("Unable to initialise network module");
-    atexit(enet_deinitialize);
+	enet_inited = true;
     enet_time_set(0);
     for(int i = 1; i<argc; i++) if(argv[i][0]!='-' || !serveroption(argv[i])) gameargs.add(argv[i]);
     game::parseoptions(gameargs);
     initserver(true, true);
     return 0;
 }
-#endif
