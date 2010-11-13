@@ -1872,6 +1872,7 @@ namespace server
 		}
 		va_end(ap);
 	}
+	ICOMMAND(irctopic, "s", (char *t), irctopic("%s", t););
 
 	void changemap(const char *s, int mode)
 	{
