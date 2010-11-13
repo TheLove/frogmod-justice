@@ -3,10 +3,8 @@
 class Config {
 
     public static $databaseDsn = "mysql:host=localhost;dbname=frogmod";
-    public static $databaseUsername = "frogmod";
-    public static $databasePassword = "frogmod";
+    public static $databaseUsername = "";
+    public static $databasePassword = "";
     public static $debug = false;
 
 }
-
-?>
