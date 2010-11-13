@@ -29,7 +29,7 @@
 #endif
 #include <time.h>
 #include <fnmatch.h>
-
+#include <signal.h>
 #include <sys/queue.h>
 #include <event.h>
 #include <evhttp.h>

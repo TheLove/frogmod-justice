@@ -36,7 +36,7 @@ static void irc_eventcb(struct bufferevent *buf, short what, void *arg) {
 		s->state = Server::SentIdent;
 	} else {
 		if(what == (BEV_EVENT_EOF | BEV_EVENT_READING))
-			printf("Disconnected from \"%s\".", s->host);
+			printf("Disconnected from \"%s\".\n", s->host);
 		else bufferevent_print_error(what, "Disconnected from \"%s\":", s->host);
 
 		DEBUGF(bufferevent_free(s->buf));
@@ -86,7 +86,7 @@ void Server::quit(const char *msg, int quitsecs) {
 		struct timeval readtv;
 		readtv.tv_sec = quitsecs;
 		readtv.tv_usec = 0;
-		bufferevent_set_timeouts(buf, &readtv, NULL); // we don't want to wait for the server to close the connection more than a second
+		bufferevent_set_timeouts(buf, &readtv, NULL); // we don't want to wait for the server to close the connection more than a few seconds
 		state = Quitting;
 	}
 }
@@ -200,6 +200,14 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 	} else if(!strcmp(command, "QUIT")) {
 		for(unsigned int i = 0; i < peers.size(); i++) {
 			if(!strcmp(peers[i]->nick, stripident(prefix))) {
+				if(client->quit_cb) {
+					Source s;
+					s.server = this;
+					s.client = client;
+					s.peer = findpeer(stripident(prefix));
+					s.channel = NULL; // quit is server-wide
+					client->quit_cb(&s, trailing);
+				}
 				for(unsigned int j = 0; j < channels.size(); j++) {
 					Channel *c = channels[j];
 					for(unsigned int k = 0; k < c->peers.size(); k++) {
@@ -226,6 +234,15 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 			s.peer = findpeer(stripident(prefix));
 			s.channel = NULL;
 			client->mode_cb(&s, stripident(prefix), params[0], params[1], trailing);
+		}
+	} else if(!strcmp(command, "TOPIC")) {
+		if(client->topic_cb) {
+			Source s;
+			s.server = this;
+			s.client = client;
+			s.peer = findpeer(stripident(prefix));
+			s.channel = findchan(params[0]);
+			if(s.channel) client->topic_cb(&s, trailing);
 		}
 	} else if(isdigit(*command)) {
 		int numeric = atoi(command);
@@ -515,9 +532,9 @@ bool Client::connect(const char *host, const char *nick, int port, const char *a
 	return true;
 }
 
-void Client::quit(const char *msg) {
+void Client::quit(const char *msg, int quitsecs) {
 	for(unsigned int i = 0; i < servers.size(); i++) {
-		servers[i]->quit(msg);
+		servers[i]->quit(msg, quitsecs);
 	}
 }
 

@@ -161,14 +161,16 @@ struct Client {
 	MessageCallback channel_action_message_cb, private_action_message_cb;
 	GenericCallback notice_cb, motd_cb, unhandled_cb, ping_cb;
 	ModeCallback mode_cb;
-	JoinCallback join_cb;
-	PartCallback part_cb;
+	JoinCallback join_cb; // peer joins channel
+	PartCallback part_cb; // peer leaves channel
+	PartCallback quit_cb; // peer quits
+	MessageCallback topic_cb;
 	ServerQuitCallback server_quit_cb; // gets called when a server quitses
 	EmptyCallback empty_cb; // gets called when all servers are disconnected
 	NickCallback nick_cb;
 
 	bool connect(const char *host, const char *nick, int port = 6667, const char *alias = NULL);
-	void quit(const char *msg);
+	void quit(const char *msg, int quitsecs=1);
 	Server *findserv(const char *host) {
 		for(unsigned int i = 0; i < servers.size(); i++) {
 			if(!strcmp(servers[i]->host, host)) return servers[i];

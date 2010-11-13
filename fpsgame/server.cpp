@@ -930,7 +930,6 @@ namespace server
 		color_irc2sauer(msg, buf);
 		outf(1 | OUT_NOIRC, "\f4%s \f1* %s \f7%s", source->channel->alias, source->peer->nick, msg);
 	}
-
 	void ircnoticecb(IRC::Server *s, char *prefix, char *trailing) {
 		if(prefix) outf(2 | OUT_NOIRC, "\f2[%s]\f1 -%s- %s\f7", s->alias, prefix, trailing);
 		else outf(2 | OUT_NOIRC, "\f2[%s]\f1 %s\f7", s->alias, trailing);
@@ -945,11 +944,18 @@ namespace server
 		if(reason) outf(2 | OUT_NOIRC, "\f4 %s \f1%s\f7 \f4has parted (%s)", s->channel->alias, s->peer->nick, reason);
 		else outf(2 | OUT_NOIRC, "\f4%s \f1%s\f7 has parted", s->channel->alias, s->peer->nick);
 	}
+	void ircquitcb(IRC::Source *s, char *reason) {
+		if(reason) outf(2 | OUT_NOIRC, "\f4 %s \f1%s\f7 has left (%s)", s->server->alias, s->peer->nick, reason);
+		else outf(2 | OUT_NOIRC, "\f4%s \f1%s\f7 has left", s->server->alias, s->peer->nick);
+	}
 	void ircmodecb(IRC::Source *s, char *who, char *target, char *mode, char *extra) {
 		outf(2 | OUT_NOIRC | OUT_NOGAME, "%s sets mode %s %s %s", s->peer?s->peer->nick:who, mode, extra?extra:"", target);
 	}
 	void ircnickcb(IRC::Source *s, char *newnick) {
 		outf(2 | OUT_NOIRC, "\f4%s \f1%s \f7 is now known as \f1%s", s->server->alias, s->peer->nick, newnick);
+	}
+	void irctopiccb(IRC::Source *s, char *topic) {
+		outf(2 | OUT_NOIRC, "\f4%s \f1%s\f7 sets topic: \f2%s", s->channel->alias, s->peer->nick, topic);
 	}
 	ICOMMAND(ircecho, "C", (const char *msg), {
 		string buf;
@@ -957,22 +963,23 @@ namespace server
 		if(scriptircsource) scriptircsource->speak(buf);
 	});
 
-
 	void ircinit() {
-		irc.channel_message_cb = ircmsgcb;
-		irc.private_message_cb = NULL; // ignore
+		irc.channel_message_cb        = ircmsgcb;
+		irc.private_message_cb        = NULL; // ignore
 		irc.channel_action_message_cb = ircactioncb;
 		irc.private_action_message_cb = NULL;
-		irc.notice_cb = irc.motd_cb = ircnoticecb;
-		irc.ping_cb = ircpingcb;
-		irc.join_cb = ircjoincb;
-		irc.part_cb = ircpartcb;
-		irc.mode_cb = ircmodecb;
-		irc.nick_cb = ircnickcb;
+		irc.notice_cb                 = ircnoticecb;
+		irc.motd_cb                   = ircnoticecb;
+		irc.ping_cb                   = ircpingcb;
+		irc.join_cb                   = ircjoincb;
+		irc.part_cb                   = ircpartcb;
+		irc.quit_cb                   = ircquitcb;
+		irc.mode_cb                   = ircmodecb;
+		irc.nick_cb                   = ircnickcb;
+		irc.topic_cb                  = irctopiccb;
 	}
 
-	void serverinit()
-	{
+	void serverinit() {
 		smapname[0] = '\0';
 		resetitems();
 		httpinit();
