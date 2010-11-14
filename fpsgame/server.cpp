@@ -3054,11 +3054,11 @@ namespace server
 #ifdef HAVE_GEOIP
 				const char *country = getclientcountry(ci->clientnum);
 				if(country) {
-					outf(2 | OUT_NOGAME, "%s connected from %s", ci->name, country);
-					outf(2 | OUT_NOIRC | OUT_NOCONSOLE, "%s is connected from %s", ci->name, country);
+					outf(2 | OUT_NOGAME, "\f0%s\f7 connected from \f2%s\f7 (%s/%s)", ci->name, country, getclientipstr(ci->clientnum), getclienthostname(ci->clientnum));
+					outf(2 | OUT_NOIRC | OUT_NOCONSOLE, "\f0%s\f7 is connected from \f2%s\f7", ci->name, country);
 				} else // fall through
 #endif
-				outf(2 | OUT_NOGAME, "%s connected\n", ci->name);
+				outf(2 | OUT_NOGAME, "\f0%s\f7 connected (%s/%s)\n", ci->name, getclientipstr(ci->clientnum), getclienthostname(ci->clientnum));
 
 				http_post_event_connect(ci);
 			}
