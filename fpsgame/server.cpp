@@ -2534,7 +2534,6 @@ namespace server
 		if(h) {
 			addban(h, n, true);
 			outf(2, "Added permanent ban [%s] (%s)", h, n?n:"");
-			writecfg();
 		}
 	});
 
@@ -2557,7 +2556,6 @@ namespace server
 				bannedips.remove(i); i--;
 			}
 	    }
-		writecfg();
 	});
 
 	void addblacklist(char *p, char *r) {
@@ -2566,7 +2564,6 @@ namespace server
 			copystring(b.pattern, p);
 			if(r && *r) copystring(b.reason, r);
 			else b.reason[0] = 0;
-			writecfg();
 			outf(2, "Added to blacklist: %s (%s)", p, r?r:"");
 		}
 	}
@@ -2580,7 +2577,6 @@ namespace server
 				blacklistips.remove(i); i--;
 			}
 	    }
-		writecfg();
 	});
 	void writeblacklist(stream *f) {
 		loopv(blacklistips) {

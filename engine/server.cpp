@@ -10,6 +10,7 @@ static event pongsock_input_event;
 static event lansock_input_event;
 static event update_event;
 static event netstats_event;
+static event writecfg_event;
 IRC::Client irc;
 evbuffer *httpoutbuf = NULL;
 #ifdef HAVE_GEOIP
@@ -912,6 +913,14 @@ static void netstats_event_handler(int, short, void *) {
 	event_add(&netstats_event, &one_min);
 }
 
+static void writecfg_event_handler(int, short, void *) {
+	writecfg();
+	timeval ten_min;
+	ten_min.tv_sec = 600;
+	ten_min.tv_usec = 0;
+	event_add(&netstats_event, &ten_min);
+}
+
 static void update_server(int fd, short e, void *arg) {
 	timeval to;
 	to.tv_sec = 0;
@@ -1001,6 +1010,12 @@ bool setuplistenserver(bool dedicated)
 	one_min.tv_usec = 0;
 	evtimer_assign(&netstats_event, evbase, &netstats_event_handler, NULL);
 	event_add(&netstats_event, &one_min);
+
+	timeval ten_min;
+	ten_min.tv_sec = 600;
+	ten_min.tv_usec = 0;
+	evtimer_assign(&writecfg_event, evbase, &writecfg_event_handler, NULL);
+	event_add(&writecfg_event, &ten_min);
 
     return true;
 }
