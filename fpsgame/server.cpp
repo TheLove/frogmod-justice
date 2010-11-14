@@ -2822,7 +2822,7 @@ namespace server
 			spinfo->state.state = CS_SPECTATOR;
 			spinfo->state.timeplayed += lastmillis - spinfo->state.lasttimeplayed;
 			if(!spinfo->local && !spinfo->privilege) aiman::removeai(spinfo);
-			outf(2, "\f1%s is now a spectator", colorname(spinfo));
+			outf(2, "\f0%s\f7 is now a spectator", colorname(spinfo));
 		} else if(spinfo->state.state==CS_SPECTATOR && !val) {
 			spinfo->state.state = CS_DEAD;
 			spinfo->state.respawn();
@@ -2830,7 +2830,7 @@ namespace server
 			aiman::addclient(spinfo);
 			if(spinfo->clientmap[0] || spinfo->mapcrc) checkmaps();
 			sendf(-1, 1, "ri", N_MAPRELOAD);
-			outf(2, "\f1%s is no longer a spectator", colorname(spinfo));
+			outf(2, "\f0%s\f7 is no longer a spectator", colorname(spinfo));
 		}
 		sendf(-1, 1, "ri3", N_SPECTATOR, spectator, val);
 		if(!val && mapreload && !spinfo->privilege && !spinfo->local) sendf(spectator, 1, "ri", N_MAPRELOAD);
