@@ -1975,7 +1975,7 @@ namespace server
 			demonextmatch = false;
 			setupdemorecord();
 		}
-		irctopic("%s: %s on %s\n", serverdesc, modename(gamemode), smapname);
+		irctopic("%s\f7: %s on %s\n", serverdesc, modename(gamemode), smapname);
 	}
 
 	struct votecount
@@ -2420,7 +2420,7 @@ namespace server
 	void clearbans();
 	void noclients()
 	{
-		irctopic("%s: empty", serverdesc);
+		irctopic("%s\f7: empty", serverdesc);
 		clearbans();
 		aiman::clearai();
 	}
@@ -3585,7 +3585,7 @@ namespace server
 					notgotitems = false;
 					if(smode) smode->reset(true);
 					outf(2, "%s started a new map of size %d", ci->name, size);
-					irctopic("%s: %s on new map", serverdesc, modename(gamemode));
+					irctopic("%s\f7: %s on new map of size %d", serverdesc, modename(gamemode), size);
 				}
 				QUEUE_MSG;
 				break;
