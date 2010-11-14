@@ -2679,6 +2679,7 @@ namespace server
 
 	void processmasterinput(const char *cmd, int cmdlen, const char *args)
 	{
+		printf("processmasterinput(%s)\n", cmd);
 		uint id;
 		string val;
 		if(sscanf(cmd, "failauth %u", &id) == 1)
@@ -2798,11 +2799,12 @@ namespace server
 
 	void kick_client(int victim, clientinfo *m) {
 		clientinfo *ci = (clientinfo *)getclientinfo(victim);
-		if(m) {
+		if(m && m->privilege < PRIV_ADMIN) {
 			if(m->lastkickmillis && totalmillis - m->lastkickmillis <= kickmillis) {
 				m->nkicks++;
 				if(m->nkicks >= maxkicks) {
 					addblacklist((char *)getclientipstr(m->clientnum), (char *)"Mass kicking (automatically added).");
+					clearbans();
 					kick_client(m->clientnum, NULL);
 				} else outf(2, "\f3Kick protection triggered. Kick denied.");
 				m->lastkickmillis = totalmillis;
