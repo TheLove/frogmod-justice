@@ -2055,7 +2055,7 @@ namespace server
 			if(demorecord) enddemorecord();
 			if((!ci->local || hasnonlocalclients()) && !mapreload)
 			{
-				defformatstring(msg)("%s forced %s on map %s", ci->privilege && mastermode>=MM_VETO ? privname(ci->privilege) : "local player", modename(ci->modevote), ci->mapvote);
+				defformatstring(msg)("%s \f1%s\f7 forced \f2%s\f7 on map \f6%s\f7", ci->privilege && mastermode>=MM_VETO ? privname(ci->privilege) : "local player", ci->name, modename(ci->modevote), ci->mapvote);
 				outf(2, msg);
 			}
 			sendf(-1, 1, "risii", N_MAPCHANGE, ci->mapvote, ci->modevote, 1);
