@@ -957,7 +957,7 @@ namespace server
 
 	void ircprivcb(IRC::Source *source, char *msg) {
 		scriptircsource = source;
-		if(source && source->peer && source->peer->data[1]) execute(msg);
+		if(source && source->peer && source->peer->data[0]) execute(msg);
 		else processcommand(msg);
 		scriptircsource = NULL;
 	}
