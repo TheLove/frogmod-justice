@@ -1465,6 +1465,7 @@ namespace server
 		return false;
 	}
 
+	void updateirctopic();
 	void setmaster(clientinfo *ci, bool val, const char *pass, const char *authname)
 	{
 		if(authname && !val) return;
@@ -1512,6 +1513,7 @@ namespace server
 		else formatstring(msg)("%s %s %s", colorname(ci), val ? "claimed" : "relinquished", name);
 		outf(2, "%s. Mastermode is \f1%s\f7.", msg, mastermodename(mastermode));
 		currentmaster = val ? ci->clientnum : -1;
+		updateirctopic();
 		sendf(-1, 1, "ri4", N_CURRENTMASTER, currentmaster, currentmaster >= 0 ? ci->privilege : 0, mastermode);
 		if(gamepaused)
 		{
@@ -1923,6 +1925,14 @@ namespace server
 	}
 	ICOMMAND(irctopic, "s", (char *t), irctopic("%s", t););
 
+	void updateirctopic() {
+		if(clients.length() == 0) irctopic("\f7%s\f7: empty");
+		else {
+			clientinfo *cm = currentmaster > -1 ? (clientinfo *)getclientinfo(currentmaster) : NULL;
+			irctopic("\f7%s\f7: %s on %s%s%s\n", serverdesc, modename(gamemode), smapname, cm?(cm->privilege==PRIV_ADMIN?", admin is ":", master is "):"", cm?colorname(cm, NULL, true):"");
+		}
+	}
+
 	void changemap(const char *s, int mode)
 	{
 		stopdemo();
@@ -1975,8 +1985,7 @@ namespace server
 			demonextmatch = false;
 			setupdemorecord();
 		}
-		clientinfo *cm = currentmaster > -1 ? (clientinfo *)getclientinfo(currentmaster) : NULL;
-		irctopic("%s\f7: %s on %s%s%s\n", serverdesc, modename(gamemode), smapname, cm?(cm->privilege==PRIV_ADMIN?", admin is ":", master is "):"", cm?colorname(cm, NULL, true):"");
+		updateirctopic();
 	}
 
 	struct votecount
@@ -2421,7 +2430,7 @@ namespace server
 	void clearbans();
 	void noclients()
 	{
-		irctopic("%s\f7: empty", serverdesc);
+		updateirctopic();
 		clearbans();
 		aiman::clearai();
 	}
@@ -3584,8 +3593,7 @@ namespace server
 					if(size < 10) size = 10;
 					if(size > 16) size = 16;
 					outf(2, "%s started a new map of size %d", ci->name, size);
-					clientinfo *cm = currentmaster > -1 ? (clientinfo *)getclientinfo(currentmaster) : NULL;
-					irctopic("%s\f7: %s on new map of size %d%s%s", serverdesc, modename(gamemode), size, cm?(cm->privilege==PRIV_ADMIN?", admin is ":", master is "):"", cm?colorname(cm, NULL, true):"");
+					updateirctopic();
 				}
 				QUEUE_MSG;
 				break;
