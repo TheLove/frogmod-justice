@@ -926,7 +926,7 @@ namespace server
 
 	clientinfo *scriptclient;
 	IRC::Source *scriptircsource = NULL;
-	const char *colorname(clientinfo *ci, char *name = NULL);
+	const char *colorname(clientinfo *ci, char *name = NULL, bool forcecn = false);
 	ICOMMAND(login, "s", (char *s), {
 		if(s && *s && *adminpass && !strcmp(s, adminpass)) {
 			if(scriptircsource) {
@@ -1041,10 +1041,10 @@ namespace server
 		return false;
 	}
 
-	const char *colorname(clientinfo *ci, char *name)
+	const char *colorname(clientinfo *ci, char *name, bool forcecn)
 	{
 		if(!name) name = ci->name;
-		if(name[0] && !duplicatename(ci, name) && ci->state.aitype == AI_NONE) return name;
+		if(name[0] && !duplicatename(ci, name) && !forcecn && ci->state.aitype == AI_NONE) return name;
 		static string cname[3];
 		static int cidx = 0;
 		cidx = (cidx+1)%3;
@@ -1975,7 +1975,8 @@ namespace server
 			demonextmatch = false;
 			setupdemorecord();
 		}
-		irctopic("%s\f7: %s on %s\n", serverdesc, modename(gamemode), smapname);
+		clientinfo *cm = currentmaster > -1 ? (clientinfo *)getclientinfo(currentmaster) : NULL;
+		irctopic("%s\f7: %s on %s%s%s\n", serverdesc, modename(gamemode), smapname, cm?(cm->privilege==PRIV_ADMIN?", admin is ":", master is "):"", cm?colorname(cm, NULL, true):"");
 	}
 
 	struct votecount
@@ -3580,8 +3581,11 @@ namespace server
 					resetitems();
 					notgotitems = false;
 					if(smode) smode->reset(true);
+					if(size < 10) size = 10;
+					if(size > 16) size = 16;
 					outf(2, "%s started a new map of size %d", ci->name, size);
-					irctopic("%s\f7: %s on new map of size %d", serverdesc, modename(gamemode), size);
+					clientinfo *cm = currentmaster > -1 ? (clientinfo *)getclientinfo(currentmaster) : NULL;
+					irctopic("%s\f7: %s on new map of size %d%s%s", serverdesc, modename(gamemode), size, cm?(cm->privilege==PRIV_ADMIN?", admin is ":", master is "):"", cm?colorname(cm, NULL, true):"");
 				}
 				QUEUE_MSG;
 				break;
