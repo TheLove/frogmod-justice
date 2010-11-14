@@ -236,7 +236,7 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 			client->mode_cb(&s, stripident(prefix), params[0], params[1], trailing);
 		}
 	} else if(!strcmp(command, "TOPIC")) {
-		if(client->topic_cb) {
+		if(client->topic_cb && strcmp(stripident(prefix), nick)) {
 			Source s;
 			s.server = this;
 			s.client = client;
