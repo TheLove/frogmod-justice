@@ -2882,8 +2882,15 @@ namespace server
 	ICOMMAND(echo, "C", (char *s), {
 		if(httpoutbuf) evbuffer_add_printf(httpoutbuf, "%s", s);
 		else if(scriptclient) whisper(scriptclient->clientnum, "%s", s);
-		else if(scriptircsource) scriptircsource->reply("%s", s);
-		else printf("%s\n", s);
+		else if(scriptircsource) {
+			string buf;
+			color_sauer2irc(s, buf);
+			scriptircsource->reply("%s", buf);
+		} else {
+			string buf;
+			color_sauer2console(s, buf);
+			printf("%s\n", buf);
+		}
 	});
 
 	struct allowedcommand {
