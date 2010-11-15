@@ -130,7 +130,7 @@ void voutf(int v, const char *fmt, va_list args)
 
 	color_sauer2console(sf, sp);
 	if(!(v & OUT_NOCONSOLE)) {
-		puts(sp); fflush(stdout);
+		puts(sp);
 		if(httpoutbuf) {
 			evbuffer_add_vprintf(httpoutbuf, fmt, args);
 			evbuffer_add_printf(httpoutbuf, "\n");
@@ -1058,7 +1058,6 @@ void quitsig(int s) {
 	signal(SIGQUIT, SIG_DFL);
 	signal(SIGINT, SIG_DFL);
 	printf("\nShutting down. Press %s again to force...\n", s==SIGQUIT?"CTRL+\\":(s==SIGINT?"CTRL+C":"the same key"));
-	fflush(stdout);
 	printf("Deinitializing enet...\n");
 	if(enet_inited) enet_deinitialize();
 	writecfg();
@@ -1148,6 +1147,7 @@ vector<const char *> gameargs;
 int main(int argc, char* argv[]) {
 	signal(SIGINT, quitsig);
 	signal(SIGQUIT, quitsig);
+	setvbuf(stdout, NULL, _IOLBF, 0);
     if(enet_initialize()<0) fatal("Unable to initialise network module");
 	enet_inited = true;
     enet_time_set(0);
