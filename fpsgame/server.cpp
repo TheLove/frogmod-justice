@@ -2597,7 +2597,7 @@ namespace server
 	});
 	void writeblacklist(stream *f) {
 		loopv(blacklistips) {
-			f->printf("blacklist [%s] [%s]", blacklistips[i].pattern, blacklistips[i].reason);
+			f->printf("blacklist [%s] [%s]\n", blacklistips[i].pattern, blacklistips[i].reason);
 		}
 	}
 
