@@ -1933,10 +1933,10 @@ namespace server
 	ICOMMAND(irctopic, "s", (char *t), irctopic("%s", t););
 
 	void updateirctopic() {
-		if(clients.length() == 0) irctopic("\f7%s\f7: empty");
+		if(clients.length() == 0) irctopic("\f7%s\f7: empty", serverdesc);
 		else {
 			clientinfo *cm = currentmaster > -1 ? (clientinfo *)getclientinfo(currentmaster) : NULL;
-			irctopic("\f7%s\f7: %s on %s%s%s\n", serverdesc, modename(gamemode), smapname, cm?(cm->privilege==PRIV_ADMIN?", admin is ":", master is "):"", cm?colorname(cm, NULL, true):"");
+			irctopic("\f7%s\f7: %s on %s%s%s\n", serverdesc, modename(gamemode), smapname[0]?smapname:"new map", cm?(cm->privilege==PRIV_ADMIN?", admin is ":", master is "):"", cm?colorname(cm, NULL, true):"");
 		}
 	}
 
