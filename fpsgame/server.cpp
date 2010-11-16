@@ -994,6 +994,12 @@ namespace server
 	void irctopiccb(IRC::Source *s, char *topic) {
 		outf(2 | OUT_NOIRC, "\f4%s \f1%s\f7 sets topic: \f2%s", s->channel->alias, s->peer->nick, topic);
 	}
+	void ircversioncb(IRC::Source *s) {
+		evbuffer *eb = evbuffer_new();
+		evbuffer_add_printf(eb, "NOTICE %s :\001VERSION Frogmod irc client " FROGMOD_VERSION "\001\r\n", s->peer->nick);
+		bufferevent_write_buffer(s->server->buf, eb);
+		evbuffer_free(eb);
+	}
 	ICOMMAND(ircecho, "C", (const char *msg), {
 		string buf;
 		color_sauer2irc((char *)msg, buf);
@@ -1014,6 +1020,7 @@ namespace server
 		irc.mode_cb                   = ircmodecb;
 		irc.nick_cb                   = ircnickcb;
 		irc.topic_cb                  = irctopiccb;
+		irc.version_cb                = ircversioncb;
 	}
 
 	void serverinit() {

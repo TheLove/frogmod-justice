@@ -143,21 +143,37 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 		s.client = client;
 		s.peer = findpeer(stripident(prefix));
 		int l = strlen(trailing);
-		bool is_action = false;
-		if(*trailing == 1 && trailing[l - 1] == 1 && !strncmp(trailing + 1, "ACTION", 6)) {
+		if(*trailing == 1 && trailing[l - 1] == 1) { // special privmsg
 			trailing[l - 1] = 0;
-			is_action = true;
-		}
-		if(is_chan(params[0])) {
-			s.channel = findchan(params[0]);
-			if(is_action) {
-				if(client->channel_action_message_cb) client->channel_action_message_cb(&s, trailing + 8);
-			} else if(client->channel_message_cb) client->channel_message_cb(&s, trailing);
+			if(!strncmp(trailing + 1, "PING", 4)) {
+				if(!is_chan(prefix)) {
+					struct evbuffer *eb = evbuffer_new();
+					evbuffer_add_printf(eb, "NOTICE %s :\001PING %s\001\r\n", prefix, trailing + 6);
+					bufferevent_write_buffer(buf, eb);
+					evbuffer_free(eb);
+				}
+			} else if(!strncmp(trailing + 1, "VERSION", 7)) {
+				if(!is_chan(prefix) && client->version_cb) {
+					s.channel = NULL;
+					client->version_cb(&s);
+				}
+			} else if(!strncmp(trailing + 1, "ACTION", 6)) {
+				if(is_chan(params[0])) {
+					s.channel = findchan(params[0]);
+					if(client->channel_action_message_cb) client->channel_action_message_cb(&s, trailing + 8);
+				} else {
+					s.channel = NULL;
+					if(client->private_action_message_cb) client->private_action_message_cb(&s, trailing + 8);
+				}
+			}
 		} else {
-			s.channel = NULL;
-			if(is_action) {
-				if(client->private_action_message_cb) client->private_action_message_cb(&s, trailing + 8);
-			} else if(client->private_message_cb) client->private_message_cb(&s, trailing);
+			if(is_chan(params[0])) {
+				s.channel = findchan(params[0]);
+				if(client->channel_message_cb) client->channel_message_cb(&s, trailing);
+			} else {
+				s.channel = NULL;
+				if(client->private_message_cb) client->private_message_cb(&s, trailing);
+			}
 		}
 	} else if(!strcmp(command, "NOTICE")) {
 		if(client->notice_cb) client->notice_cb(this, prefix, trailing);
@@ -288,11 +304,7 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 			}
 		}
 	} else {
-		printf("Server::process(prefix=[%s], command=[%s],", prefix, command);
-		for(int i = 0; i < nparams; i++) {
-			printf(" params[%d]=[%s]", i, params[i]);
-		}
-		printf(", nparams=[%d], trailing=[%s]);\n", nparams, trailing);
+		if(client->unhandled_cb) client->unhandled_cb(this, prefix, command, params, nparams, trailing);
 	}
 }
 

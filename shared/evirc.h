@@ -137,16 +137,20 @@ struct Client {
 	void init() {
 		channel_message_cb = private_message_cb = 0;
 		channel_action_message_cb = private_action_message_cb = 0;
-		notice_cb = motd_cb = unhandled_cb = ping_cb = 0;
+		notice_cb = motd_cb = ping_cb = 0;
 		join_cb = 0;
-		part_cb = 0;
+		part_cb = quit_cb = 0;
 		server_quit_cb = 0;
 		empty_cb = 0;
 		mode_cb = 0;
 		nick_cb = 0;
+		topic_cb = 0;
+		version_cb = 0;
+		unhandled_cb = 0;
 	}
 
 	typedef void (*GenericCallback)(Server *, char*, char *);
+	typedef void (*UnhandledCallback)(Server *, char *pfx, char *cmd, char **params, int nparams, char *trailing);
 	typedef void (*MessageCallback)(Source *, char *msg);
 	typedef void (*ServerQuitCallback)(Server *);
 	typedef void (*EmptyCallback)(void);
@@ -154,10 +158,11 @@ struct Client {
 	typedef void (*PartCallback)(Source *, char *reason);
 	typedef void (*ModeCallback)(Source *, char *who, char *target, char *mode, char *args);
 	typedef void (*NickCallback)(Source *, char *newnick);
+	typedef void (*VersionCallback)(Source *);
 
 	MessageCallback channel_message_cb, private_message_cb;
 	MessageCallback channel_action_message_cb, private_action_message_cb;
-	GenericCallback notice_cb, motd_cb, unhandled_cb, ping_cb;
+	GenericCallback notice_cb, motd_cb, ping_cb;
 	ModeCallback mode_cb;
 	JoinCallback join_cb; // peer joins channel
 	PartCallback part_cb; // peer leaves channel
@@ -166,6 +171,8 @@ struct Client {
 	ServerQuitCallback server_quit_cb; // gets called when a server quitses
 	EmptyCallback empty_cb; // gets called when all servers are disconnected
 	NickCallback nick_cb;
+	VersionCallback version_cb;
+	UnhandledCallback unhandled_cb;
 
 	bool connect(const char *host, const char *nick, int port = 6667, const char *alias = NULL);
 	void quit(const char *msg, int quitsecs=1);
