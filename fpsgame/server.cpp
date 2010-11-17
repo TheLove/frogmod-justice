@@ -982,11 +982,11 @@ namespace server
 		else outf(2 | OUT_NOIRC, "\f4%s \f1%s\f7 has parted", s->channel->alias, s->peer->nick);
 	}
 	void ircquitcb(IRC::Source *s, char *reason) {
-		if(reason) outf(2 | OUT_NOIRC, "\f4 %s \f1%s\f7 has left (%s)", s->server->alias, s->peer->nick, reason);
+		if(reason) outf(2 | OUT_NOIRC, "\f4%s \f1%s\f7 has left (%s)", s->server->alias, s->peer->nick, reason);
 		else outf(2 | OUT_NOIRC, "\f4%s \f1%s\f7 has left", s->server->alias, s->peer->nick);
 	}
-	void ircmodecb(IRC::Source *s, char *who, char *target, char *mode, char *extra) {
-		outf(2 | OUT_NOIRC | OUT_NOGAME, "%s sets mode %s %s %s", s->peer?s->peer->nick:who, mode, extra?extra:"", target);
+	void ircmodecb(IRC::Source *s, char *who, char *mode, char *target) {
+		outf(2 | OUT_NOIRC | OUT_NOGAME, "\f4%s \f1*%s\f7 sets mode %s \f1%s", s->channel?s->channel->alias:s->server->alias, s->peer?s->peer->nick:who, mode, target);
 	}
 	void ircnickcb(IRC::Source *s, char *newnick) {
 		outf(2 | OUT_NOIRC, "\f4%s \f1%s \f7 is now known as \f1%s", s->server->alias, s->peer->nick, newnick);

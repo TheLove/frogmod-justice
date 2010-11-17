@@ -111,6 +111,14 @@ struct Server {
 	void speakto(const char *to, const char *fmt, ...); // speaks to the specified channel or peer
 	void vspeakto(const char *to, const char *fmt, va_list ap);
 	void bspeakto(const char *to, evbuffer *evb);
+	
+	void dump_unhandled(char *prefix, char *command, char **params, int nparams, char *trailing) {
+		printf("Server::process(prefix=[%s], command=[%s],", prefix, command);
+		for(int i = 0; i < nparams; i++) {
+			printf(" params[%d]=[%s]", i, params[i]);
+		}
+		printf(", nparams=[%d], trailing=[%s]);\n", nparams, trailing);
+	}
 };
 
 struct Source {
@@ -156,7 +164,7 @@ struct Client {
 	typedef void (*EmptyCallback)(void);
 	typedef void (*JoinCallback)(Source *);
 	typedef void (*PartCallback)(Source *, char *reason);
-	typedef void (*ModeCallback)(Source *, char *who, char *target, char *mode, char *args);
+	typedef void (*ModeCallback)(Source *, char *who, char *mode, char *target);
 	typedef void (*NickCallback)(Source *, char *newnick);
 	typedef void (*VersionCallback)(Source *);
 

@@ -248,8 +248,8 @@ void Server::process(char *prefix, char *command, char *params[], int nparams, c
 			s.server = this;
 			s.client = client;
 			s.peer = findpeer(stripident(prefix));
-			s.channel = NULL;
-			client->mode_cb(&s, stripident(prefix), params[0], params[1], trailing);
+			s.channel = nparams>=1?findchan(params[0]):NULL;
+			client->mode_cb(&s, stripident(prefix), params[1], nparams>=3?params[2]:NULL);
 		}
 	} else if(!strcmp(command, "TOPIC")) {
 		if(client->topic_cb && strcmp(stripident(prefix), nick)) {
