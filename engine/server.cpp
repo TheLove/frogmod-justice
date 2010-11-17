@@ -122,7 +122,9 @@ void fatal(const char *s, ...)
     printf("servererror: %s\n", msg); 
     exit(EXIT_FAILURE); 
 }
-
+SVAR(logfile, "");
+vector<logline> lastloglines;
+VAR(memlogsize, 0, 20, 1000);
 void voutf(int v, const char *fmt, va_list args)
 {
 	string sf, sp;
@@ -141,6 +143,21 @@ void voutf(int v, const char *fmt, va_list args)
 		irc.speak(v & 0xff, "%s", sp);
 	}
 	if(!(v & OUT_NOGAME)) server::sendservmsg(sf);
+	if(logfile[0]) {
+		stream *f = openfile(path(logfile, true), "a");
+		struct timeval tv;
+		gettimeofday(&tv, NULL);
+		f->printf("%08lu %s\n", tv.tv_sec, sf);
+		f->close();
+		// memory log
+		logline &l = lastloglines.add();
+		l.ts = tv.tv_sec;
+		l.line = strdup(sf);
+		while(lastloglines.length() > memlogsize) {
+			if(lastloglines[0].line) free(lastloglines[0].line);
+			lastloglines.remove(0);
+		}
+	}
 }
 
 void outf(const char *fmt, ...)
@@ -182,7 +199,7 @@ void conoutf(int type, const char *fmt, ...)
 }
 
 ICOMMAND(say, "C", (char *s), {
-	outf(0, "\f4[ADMIN] \f7%s", s);
+	outf(0, "\f3%s", s);
 });
 
 #endif

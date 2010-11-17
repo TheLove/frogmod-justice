@@ -698,20 +698,23 @@ namespace server
 		evbuffer_free(buf);
 	}
 
-	void spectator(int, int);
-	void setmaster(clientinfo *ci, bool val, const char *pass = "", const char *authname = NULL);
-	void kick_client(int cn, clientinfo *m = NULL);
-	static void httpadmincb(struct evhttp_request *req, void *arg) {
+	bool checkhttpauth(struct evhttp_request *req) {
 		struct evkeyvalq *k = evhttp_request_get_input_headers(req);
 		const char *auth = evhttp_find_header(k, "Authorization");
-		bool good = false;
 		if(adminpass[0] && auth) {
 			string auth_type, auth_string;
 			sscanf(auth, "%20s %150s", auth_type, auth_string);
 			defformatstring(pass)("admin:%s", adminpass);
-			good = base64_strcmp(pass, auth_string);
+			return base64_strcmp(pass, auth_string);
 		}
-		if(good) {
+		return false;
+	}
+
+	void spectator(int, int);
+	void setmaster(clientinfo *ci, bool val, const char *pass = "", const char *authname = NULL);
+	void kick_client(int cn, clientinfo *m = NULL);
+	static void httpadmincb(struct evhttp_request *req, void *arg) {
+		if(checkhttpauth(req)) {
 			struct evkeyvalq query;
 			evhttp_parse_query(evhttp_request_get_uri(req), &query);
 			// kick
@@ -733,6 +736,31 @@ namespace server
 		}
 	}
 
+	static void httplogcb(struct evhttp_request *req, void *arg) {
+		if(checkhttpauth(req)) {
+			struct evkeyvalq query;
+			evhttp_parse_query(evhttp_request_get_uri(req), &query);
+			const char *val;
+			unsigned long min_ts = 0;
+			if((val = evhttp_find_header(&query, "ts"))) {
+				min_ts = atoi(val);
+			}
+			evbuffer *buf = evbuffer_new();
+			evbuffer_add_printf(buf, "[\n");
+			loopv(lastloglines) {
+				if(lastloglines[i].ts >= min_ts) {
+					evbuffer_add_printf(buf, "{ ");
+					evbuffer_add_json_prop(buf, "ts", (int)lastloglines[i].ts);
+					evbuffer_add_json_prop(buf, "line", lastloglines[i].line, false);
+					evbuffer_add_printf(buf, "}%c", i == lastloglines.length() - 1 ? ' ' : ',');
+				}
+			}
+			evbuffer_add_printf(buf, "]");
+			evhttp_send_reply(req, 200, "OK", buf);
+			evbuffer_free(buf);
+		} else evhttp_send_error(req, 404, "Not Found");
+	}
+
 	static void httpindexcb(struct evhttp_request *req, void *arg) {
 		evhttp_serve_file(req, "index.html");
 	}
@@ -750,6 +778,7 @@ namespace server
 		evhttp_set_cb(http, "/status", httpstatuscb, NULL);
 		evhttp_set_cb(http, "/players", httpplayerscb, NULL);
 		evhttp_set_cb(http, "/admin", httpadmincb, NULL);
+		evhttp_set_cb(http, "/log", httplogcb, NULL);
 		evhttp_set_gencb(http, httpgencb, NULL);
 	}
 

@@ -54,7 +54,7 @@ th {
 .right { float: right; }
 .clear { clear: both; }
 
-#result {
+#result, #log {
 	background: #deffde;
 	border: 1px solid darkGreen;
 	padding: 8px;

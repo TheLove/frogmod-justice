@@ -61,8 +61,9 @@ Loading...
 		<input type="submit" value="Run">
 		<a href="http://wiki.github.com/vampirefrog/frogmod-justice/commands" target="_blank">command list</a>
 	</form></li>
-	<li><form action="" method="GET" onsubmit="var elm = document.getElementById('saytext'); if(elm && elm.value) { execute('say '+elm.value); elm.value = ''; } return false;">
-		<input type="text" id="saytext" name="command" size="30">
+	<li><form action="" method="GET" onsubmit="sendtext(); return false;">
+		<input type="text" id="sayname" name="name" size="30">
+		<input type="text" id="saytext" name="text" size="30">
 		<input type="submit" value="Say">
 	</form></li>
 </ul>
@@ -73,6 +74,10 @@ Loading...
 </table>
 <h2>Players:</h2>
 <div id="players">
+Loading...
+</div>
+<h2>Log:</h2>
+<div id="log">
 Loading...
 </div>
 <div id="footer">

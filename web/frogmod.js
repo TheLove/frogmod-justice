@@ -3,10 +3,37 @@
 var info_update_millis = 100000; // server info rarely changes
 var players_update_millis = 2000;
 var status_update_millis = 2000;
+var log_update_millis = 2000;
 var result_millis = 5000;
 var admin = false;
 var states = [ 'Alive', 'Dead', 'Spawning', 'Lagged', 'Editing', 'Spectator' ];
 var icons = [ 'fixit.png', 'ironsnout.png', 'ogro.png', 'inky.png', 'cannon.png' ];
+
+// cookie functions copied from http://www.quirksmode.org/js/cookies.html#ex
+function createCookie(name,value,days) {
+	if (days) {
+		var date = new Date();
+		date.setTime(date.getTime()+(days*24*60*60*1000));
+		var expires = "; expires="+date.toGMTString();
+	}
+	else var expires = "";
+	document.cookie = name+"="+value+expires+"; path=/";
+}
+
+function readCookie(name) {
+	var nameEQ = name + "=";
+	var ca = document.cookie.split(';');
+	for(var i=0;i < ca.length;i++) {
+		var c = ca[i];
+		while (c.charAt(0)==' ') c = c.substring(1,c.length);
+		if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+	}
+	return null;
+}
+
+function eraseCookie(name) {
+	createCookie(name,"",-1);
+}
 
 function ajaxCall(uri, cb) {
 	var xhr;
@@ -43,7 +70,7 @@ function nl2br(str) {
 }
 
 function autoUrls(str) {
-	if(!str) return;
+	if(!str) return '';
 //	urls = str.match(/(ftp|http|https):\/\/(\w+:{0,1}\w*@)?([^\s<>]+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/);
 //	for(u in urls) str = str.replace(urls[u][3], '<a href="'+urls[u][3]+'">'+escapeHtml(urls[u][3])+'</a>');
 	return str;
@@ -101,7 +128,20 @@ function execute(c) {
 	update_info();
 	update_status();
 	update_players();
+	update_log();
 	return false;
+}
+
+function sendtext() {
+	var elm = document.getElementById('saytext');
+	var nelm = document.getElementById('sayname');
+	if(nelm && nelm.value) createCookie('name', nelm.value, 300); // about a year :P
+	if(elm && elm.value) {
+		code = elm.value.replace(/(["^])/g, '^$1');
+		if(code[0] == '/') execute(code.substr(1));
+		execute('say "'+(nelm&&nelm.value?'^f5['+nelm.value+']^f7 ':'')+code+'"');
+		elm.value = '';
+	}
 }
 
 var info_timeout = null;
@@ -256,8 +296,34 @@ function update_players(admin) {
 	ajaxCall('/players', admin ? function() { update_players_cb(this, true); } : function() { update_players_cb(this, false); });
 }
 
+var log_timeout = null;
+function update_log() {
+	if(log_timeout) { clearTimeout(log_timeout); log_timeout = null; }
+	ajaxCall('/log', function() {
+		if(this.readyState == 4) {
+			var div = document.getElementById('log');
+			if(div) {
+				if(this.status == 200) {
+					var log = eval('(' + this.responseText + ')');
+					var lines = new Array();
+					for(i in log) {
+						lines.push(convert_cube_string(log[i].line));
+					}
+					div.innerHTML = lines.join('<br>');
+				} else {
+					div.innerHTML = 'Error ' + (xhr.status ? xhr.status : '(unreachable)');
+				}
+			}
+			log_timeout = setTimeout(update_log, log_update_millis);
+		}
+	});
+}
+
 function init() {
 	update_info();
 	update_status();
 	update_players();
+	var elm = document.getElementById('sayname');
+	if(elm) elm.value = readCookie('name');
+	if(admin) update_log();
 }
