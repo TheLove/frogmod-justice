@@ -1164,7 +1164,7 @@ vector<const char *> gameargs;
 int main(int argc, char* argv[]) {
 	signal(SIGINT, quitsig);
 	signal(SIGQUIT, quitsig);
-	setvbuf(stdout, NULL, _IOLBF, 0);
+	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
     if(enet_initialize()<0) fatal("Unable to initialise network module");
 	enet_inited = true;
     enet_time_set(0);
