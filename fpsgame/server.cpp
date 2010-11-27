@@ -2842,7 +2842,7 @@ namespace server
 					addblacklist((char *)getclientipstr(m->clientnum), (char *)"Mass kicking (automatically added).");
 					clearbans();
 					kick_client(m->clientnum, NULL);
-				} else outf(2, "\f3Kick protection triggered. Kick denied.");
+				} else outf(2, "\f3Kick protection triggered (%s/%s). Kick denied for %s/%s.", colorname(ci), getclientipstr(victim), colorname(m), getclientipstr(m->clientnum));
 				m->lastkickmillis = totalmillis;
 				return;
 			} else m->nkicks = 0;
