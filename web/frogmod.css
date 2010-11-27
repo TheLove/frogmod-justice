@@ -54,7 +54,7 @@ th {
 .right { float: right; }
 .clear { clear: both; }
 
-#result, #log {
+#result {
 	background: #deffde;
 	border: 1px solid darkGreen;
 	padding: 8px;
@@ -67,6 +67,11 @@ th {
 #commandstable td {
 	border: 0;
 	vertical-align: top;
+}
+#log {
+	background: black;
+	color: white;
+	padding: 2px;
 }
 
 .privilege0 {
