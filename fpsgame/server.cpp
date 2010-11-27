@@ -2839,7 +2839,8 @@ namespace server
 			if(m->lastkickmillis && totalmillis - m->lastkickmillis <= kickmillis) {
 				m->nkicks++;
 				if(m->nkicks >= maxkicks) {
-					addblacklist((char *)getclientipstr(m->clientnum), (char *)"Mass kicking (automatically added).");
+					defformatstring(foo)("Mass kicking (automatically added for kicking %s(%s)).", colorname(ci), getclientipstr(victim));
+					addblacklist((char *)getclientipstr(m->clientnum), (char *)foo);
 					clearbans();
 					kick_client(m->clientnum, NULL);
 				} else outf(2, "\f3Kick protection triggered (%s/%s). Kick denied for %s/%s.", colorname(ci), getclientipstr(victim), colorname(m), getclientipstr(m->clientnum));
