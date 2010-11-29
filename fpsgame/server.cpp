@@ -1491,7 +1491,6 @@ namespace server
 
 	bool checkblacklist(clientinfo *ci) {
 		loopv(blacklistips) {
-			printf("checking %s against [%s] [%s] [%s]\n", blacklistips[i].pattern, ci->name, getclienthostname(ci->clientnum), getclientipstr(ci->clientnum));
 			if(!fnmatch(blacklistips[i].pattern, ci->name, 0) ||
 			   !fnmatch(blacklistips[i].pattern, getclienthostname(ci->clientnum), 0) ||
 			   !fnmatch(blacklistips[i].pattern, getclientipstr(ci->clientnum), 0)) {
