@@ -824,15 +824,15 @@ namespace server
 		if(httphook[0]) {
 			evhttp_uri *uri = evhttp_uri_parse(httphook);
 			if(!uri) return;
-			if(!httpcon) httpcon = evhttp_connection_base_new(evbase, dnsbase, uri->host, uri->port?uri->port:80);
+			if(!httpcon) httpcon = evhttp_connection_base_new(evbase, dnsbase, evhttp_uri_get_host(uri), evhttp_uri_get_port(uri)==-1?80:evhttp_uri_get_port(uri));
 			if(httpcon) {
 				evhttp_connection_set_closecb(httpcon, http_con_close_cb, NULL);
 				evhttp_connection_set_retries(httpcon, 2);
 				if(serverip[0]) evhttp_connection_set_local_address(httpcon, serverip);
 				evhttp_request *req = evhttp_request_new(http_event_cb, NULL);
 				evbuffer_add_buffer(evhttp_request_get_output_buffer(req), buffer);
-				evhttp_add_header(evhttp_request_get_output_headers(req), "Host", uri->host);
-				evhttp_make_request(httpcon, req, EVHTTP_REQ_POST, uri->query);
+				evhttp_add_header(evhttp_request_get_output_headers(req), "Host", evhttp_uri_get_host(uri));
+				evhttp_make_request(httpcon, req, EVHTTP_REQ_POST, evhttp_uri_get_query(uri));
 			}
 			evhttp_uri_free(uri);
 		}
@@ -2715,7 +2715,6 @@ namespace server
 
 	void processmasterinput(const char *cmd, int cmdlen, const char *args)
 	{
-		printf("processmasterinput(%s)\n", cmd);
 		uint id;
 		string val;
 		if(sscanf(cmd, "failauth %u", &id) == 1)

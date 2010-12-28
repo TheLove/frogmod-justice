@@ -36,7 +36,7 @@ build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS = event-test$(EXEEXT) time-test$(EXEEXT) \
 	signal-test$(EXEEXT) dns-example$(EXEEXT) hello-world$(EXEEXT) \
-	$(am__EXEEXT_1)
+	http-server$(EXEEXT) $(am__EXEEXT_1)
 @OPENSSL_TRUE@am__append_1 = le-proxy
 subdir = sample
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
@@ -65,6 +65,10 @@ hello_world_SOURCES = hello-world.c
 hello_world_OBJECTS = hello-world.$(OBJEXT)
 hello_world_LDADD = $(LDADD)
 hello_world_DEPENDENCIES = ../libevent.la
+http_server_SOURCES = http-server.c
+http_server_OBJECTS = http-server.$(OBJEXT)
+http_server_LDADD = $(LDADD)
+http_server_DEPENDENCIES = ../libevent.la
 le_proxy_SOURCES = le-proxy.c
 le_proxy_OBJECTS = le-proxy.$(OBJEXT)
 @OPENSSL_TRUE@le_proxy_DEPENDENCIES = $(LDADD) ../libevent_openssl.la
@@ -88,10 +92,10 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = dns-example.c event-test.c hello-world.c le-proxy.c \
-	signal-test.c time-test.c
-DIST_SOURCES = dns-example.c event-test.c hello-world.c le-proxy.c \
-	signal-test.c time-test.c
+SOURCES = dns-example.c event-test.c hello-world.c http-server.c \
+	le-proxy.c signal-test.c time-test.c
+DIST_SOURCES = dns-example.c event-test.c hello-world.c http-server.c \
+	le-proxy.c signal-test.c time-test.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -197,7 +201,6 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
-lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
@@ -221,6 +224,7 @@ time_test_sources = time-test.c
 signal_test_sources = signal-test.c
 dns_example_sources = dns-example.c
 hello_world_sources = hello-world.c
+http_server_sources = http-server.c
 @OPENSSL_TRUE@le_proxy_sources = le-proxy.c
 @OPENSSL_TRUE@le_proxy_LDADD = $(LDADD) ../libevent_openssl.la -lcrypto -lssl
 DISTCLEANFILES = *~
@@ -276,6 +280,9 @@ event-test$(EXEEXT): $(event_test_OBJECTS) $(event_test_DEPENDENCIES)
 hello-world$(EXEEXT): $(hello_world_OBJECTS) $(hello_world_DEPENDENCIES) 
 	@rm -f hello-world$(EXEEXT)
 	$(LINK) $(hello_world_OBJECTS) $(hello_world_LDADD) $(LIBS)
+http-server$(EXEEXT): $(http_server_OBJECTS) $(http_server_DEPENDENCIES) 
+	@rm -f http-server$(EXEEXT)
+	$(LINK) $(http_server_OBJECTS) $(http_server_LDADD) $(LIBS)
 le-proxy$(EXEEXT): $(le_proxy_OBJECTS) $(le_proxy_DEPENDENCIES) 
 	@rm -f le-proxy$(EXEEXT)
 	$(LINK) $(le_proxy_OBJECTS) $(le_proxy_LDADD) $(LIBS)

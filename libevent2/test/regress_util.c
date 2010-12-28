@@ -206,7 +206,7 @@ regress_ipv6_parse(void *ptr)
 
 static struct sa_port_ent {
 	const char *parse;
-	int sa_family;
+	int safamily;
 	const char *addr;
 	int port;
 } sa_port_ents[] = {
@@ -235,14 +235,14 @@ regress_sockaddr_port_parse(void *ptr)
 		memset(&ss, 0, sizeof(ss));
 		r = evutil_parse_sockaddr_port(ent->parse, (struct sockaddr*)&ss, &len);
 		if (r < 0) {
-			if (ent->sa_family)
+			if (ent->safamily)
 				TT_FAIL(("Couldn't parse %s!", ent->parse));
 			continue;
-		} else if (! ent->sa_family) {
+		} else if (! ent->safamily) {
 			TT_FAIL(("Shouldn't have been able to parse %s!", ent->parse));
 			continue;
 		}
-		if (ent->sa_family == AF_INET) {
+		if (ent->safamily == AF_INET) {
 			struct sockaddr_in sin;
 			memset(&sin, 0, sizeof(sin));
 #ifdef _EVENT_HAVE_STRUCT_SOCKADDR_IN_SIN_LEN
@@ -602,7 +602,7 @@ end:
 }
 
 struct example_struct {
-	long a;
+	const char *a;
 	const char *b;
 	long c;
 };
@@ -612,11 +612,11 @@ test_evutil_upcast(void *arg)
 {
 	struct example_struct es1;
 	const char **cp;
-	es1.a = 5;
+	es1.a = "World";
 	es1.b = "Hello";
 	es1.c = -99;
 
-	tt_int_op(evutil_offsetof(struct example_struct, b), ==, sizeof(long));
+	tt_int_op(evutil_offsetof(struct example_struct, b), ==, sizeof(char*));
 
 	cp = &es1.b;
 	tt_ptr_op(EVUTIL_UPCAST(cp, struct example_struct, b), ==, &es1);

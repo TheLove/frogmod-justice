@@ -83,8 +83,8 @@
 #define open _open
 #define read _read
 #define close _close
-#define fstat _fstat
-#define stat _stat
+#define fstat _fstati64
+#define stat _stati64
 #endif
 
 /**
@@ -125,13 +125,18 @@ evutil_read_file(const char *filename, char **content_out, size_t *len_out,
 		close(fd);
 		return -2;
 	}
-	mem = mm_malloc(st.st_size + 1);
+	mem = mm_malloc((size_t)st.st_size + 1);
 	if (!mem) {
 		close(fd);
 		return -2;
 	}
 	read_so_far = 0;
-	while ((r = read(fd, mem+read_so_far, st.st_size - read_so_far)) > 0) {
+#ifdef WIN32
+#define N_TO_READ(x) ((x) > INT_MAX) ? INT_MAX : ((int)(x))
+#else
+#define N_TO_READ(x) (x)
+#endif
+	while ((r = read(fd, mem+read_so_far, N_TO_READ(st.st_size - read_so_far))) > 0) {
 		read_so_far += r;
 		if (read_so_far >= (size_t)st.st_size)
 			break;
@@ -266,8 +271,11 @@ evutil_make_socket_nonblocking(evutil_socket_t fd)
 {
 #ifdef WIN32
 	{
-		unsigned long nonblocking = 1;
-		ioctlsocket(fd, FIONBIO, (unsigned long*) &nonblocking);
+		u_long nonblocking = 1;
+		if (ioctlsocket(fd, FIONBIO, &nonblocking) == SOCKET_ERROR) {
+			event_sock_warn(fd, "fcntl(%d, F_GETFL)", (int)fd);
+			return -1;
+		}
 	}
 #else
 	{
@@ -1340,7 +1348,7 @@ evutil_gai_strerror(int err)
 	 * conflict with the platform's native error codes. */
 	switch (err) {
 	case EVUTIL_EAI_CANCEL:
-		return "Request cancelled";
+		return "Request canceled";
 	case 0:
 		return "No error";
 
@@ -1475,6 +1483,13 @@ evutil_vsnprintf(char *buf, size_t buflen, const char *format, va_list ap)
 	r = _vsnprintf(buf, buflen, format, ap);
 	if (r < 0)
 		r = _vscprintf(format, ap);
+#elif defined(sgi)
+	/* Make sure we always use the correct vsnprintf on IRIX */
+	extern int      _xpg5_vsnprintf(char * __restrict,
+		__SGI_LIBC_NAMESPACE_QUALIFIER size_t,
+		const char * __restrict, /* va_list */ char *);
+
+	r = _xpg5_vsnprintf(buf, buflen, format, ap);
 #else
 	r = vsnprintf(buf, buflen, format, ap);
 #endif
@@ -1714,7 +1729,7 @@ evutil_parse_sockaddr_port(const char *ip_as_string, struct sockaddr *out, int *
 		if (!(cp = strchr(ip_as_string, ']'))) {
 			return -1;
 		}
-		len = cp-(ip_as_string + 1);
+		len = (int) ( cp-(ip_as_string + 1) );
 		if (len > (int)sizeof(buf)-1) {
 			return -1;
 		}

@@ -104,9 +104,9 @@ eqsocket(struct event_map_entry *e1, struct event_map_entry *e2)
 	return e1->fd == e2->fd;
 }
 
-HT_PROTOTYPE(event_io_map, event_map_entry, map_node, hashsocket, eqsocket);
+HT_PROTOTYPE(event_io_map, event_map_entry, map_node, hashsocket, eqsocket)
 HT_GENERATE(event_io_map, event_map_entry, map_node, hashsocket, eqsocket,
-			0.5, mm_malloc, mm_realloc, mm_free);
+			0.5, mm_malloc, mm_realloc, mm_free)
 
 #define GET_IO_SLOT(x, map, slot, type)					\
 	do {								\
@@ -704,15 +704,15 @@ event_changelist_del(struct event_base *base, evutil_socket_t fd, short old, sho
 	 */
 
 	if (events & (EV_READ|EV_SIGNAL)) {
-                if (!(change->old_events & (EV_READ | EV_SIGNAL)) &&
-                    (change->read_change & EV_CHANGE_ADD))
+		if (!(change->old_events & (EV_READ | EV_SIGNAL)) &&
+		    (change->read_change & EV_CHANGE_ADD))
 			change->read_change = 0;
 		else
 			change->read_change = EV_CHANGE_DEL;
 	}
 	if (events & EV_WRITE) {
-                if (!(change->old_events & EV_WRITE) &&
-                    (change->write_change & EV_CHANGE_ADD))
+		if (!(change->old_events & EV_WRITE) &&
+		    (change->write_change & EV_CHANGE_ADD))
 			change->write_change = 0;
 		else
 			change->write_change = EV_CHANGE_DEL;

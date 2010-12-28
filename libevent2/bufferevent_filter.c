@@ -233,6 +233,9 @@ be_filter_destruct(struct bufferevent *bev)
 		}
 	} else {
 		if (bevf->underlying) {
+			if (bevf->underlying->errorcb == be_filter_eventcb)
+				bufferevent_setcb(bevf->underlying,
+				    NULL, NULL, NULL, NULL);
 			bufferevent_unsuspend_read(bevf->underlying,
 			    BEV_SUSPEND_FILT_READ);
 		}
@@ -423,6 +426,7 @@ be_filter_readcb(struct bufferevent *underlying, void *_me)
 	else
 		state = BEV_NORMAL;
 
+	/* XXXX use return value */
 	res = be_filter_process_input(bevf, state, &processed_any);
 
 	/* XXX This should be in process_input, not here.  There are
