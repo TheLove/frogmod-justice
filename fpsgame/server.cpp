@@ -832,7 +832,7 @@ namespace server
 				evhttp_request *req = evhttp_request_new(http_event_cb, NULL);
 				evbuffer_add_buffer(evhttp_request_get_output_buffer(req), buffer);
 				evhttp_add_header(evhttp_request_get_output_headers(req), "Host", evhttp_uri_get_host(uri));
-				evhttp_make_request(httpcon, req, EVHTTP_REQ_POST, evhttp_uri_get_query(uri));
+				evhttp_make_request(httpcon, req, EVHTTP_REQ_POST, evhttp_uri_get_path(uri));
 			}
 			evhttp_uri_free(uri);
 		}
