@@ -122,41 +122,34 @@ void fatal(const char *s, ...)
     exit(EXIT_FAILURE); 
 }
 SVAR(logfile, "");
-vector<logline> lastloglines;
-VAR(memlogsize, 0, 20, 1000);
 void voutf(int v, const char *fmt, va_list args)
 {
-	string sf, sp;
-	vformatstring(sf, fmt, args);
+	char *s = bvprintf(fmt, args);
 
-	color_sauer2console(sf, sp);
 	if(!(v & OUT_NOCONSOLE)) {
+		char *sp = color_sauer2console(s);
 		puts(sp);
-		if(httpoutbuf) {
-			evbuffer_add_vprintf(httpoutbuf, fmt, args);
-			evbuffer_add_printf(httpoutbuf, "\n");
-		}
+		free(sp);
+		if(httpoutbuf) evbuffer_add_printf(httpoutbuf, "%s\n", s);
 	}
 	if(irc.base && !(v & OUT_NOIRC)) {
-		color_sauer2irc(sf, sp);
+		char *sp = color_sauer2irc(s);
 		irc.speak(v & 0xff, "%s", sp);
+		free(sp);
 	}
-	if(!(v & OUT_NOGAME)) server::sendservmsg(sf);
+	if(!(v & OUT_NOGAME)) server::sendservmsg(s);
+
 	if(logfile[0]) {
 		stream *f = openfile(path(logfile, true), "a");
 		struct timeval tv;
 		gettimeofday(&tv, NULL);
-		f->printf("%08lu %s\n", tv.tv_sec, sf);
+		f->printf("%08lu %s\n", tv.tv_sec, s);
 		f->close();
-		// memory log
-		logline &l = lastloglines.add();
-		l.ts = tv.tv_sec;
-		l.line = strdup(sf);
-		while(lastloglines.length() > memlogsize) {
-			if(lastloglines[0].line) free(lastloglines[0].line);
-			lastloglines.remove(0);
-		}
 	}
+
+	server::httplog(s);
+
+	free(s);
 }
 
 void outf(const char *fmt, ...)
