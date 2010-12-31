@@ -3,6 +3,7 @@ config.h
 config.mk
 
 *.log
+log.txt
 core.*
 vgcore.*
 
