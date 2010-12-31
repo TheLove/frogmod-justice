@@ -588,6 +588,12 @@ namespace server
 		evbuffer_add_printf(buf, "\": %d%s\n", val, comma?",":"");
 	}
 
+	void evbuffer_add_json_prop(evbuffer *buf, const char *name, ev_uint64_t val, bool comma=true) {
+		evbuffer_add_printf(buf, "\t\"");
+		evbuffer_add_json_string(buf, name);
+		evbuffer_add_printf(buf, "\": %llu%s\n", val, comma?",":"");
+	}
+
 	void evbuffer_add_json_prop(evbuffer *buf, const char *name, float val, bool comma=true) {
 		evbuffer_add_printf(buf, "\t\"");
 		evbuffer_add_json_string(buf, name);
@@ -735,29 +741,74 @@ namespace server
 		}
 	}
 
+	evbuffer *httpoutbuf;
+	ev_uint64_t loglineid = 1;
+	struct logline {
+		struct timeval tv;
+		ev_uint64_t id;
+		char *line;
+	};
+	vector<logline> lastloglines;
+
+	struct chatreq {
+		evhttp_request *req;
+	};
+	vector<chatreq> reqs;
+	void evbuffer_add_logline(evbuffer *buf, logline *l, bool comma=true) {
+		evbuffer_add_printf(buf, "{ ");
+		evbuffer_add_json_prop(buf, "ts", (ev_uint64_t)l->tv.tv_sec);
+		evbuffer_add_json_prop(buf, "id", l->id);
+		evbuffer_add_json_prop(buf, "line", l->line, false);
+		evbuffer_add_printf(buf, "}%c", comma ? ',' : ' ');
+	}
+
 	static void httplogcb(struct evhttp_request *req, void *arg) {
 		if(checkhttpauth(req)) {
 			struct evkeyvalq query;
 			evhttp_parse_query(evhttp_request_get_uri(req), &query);
+			ev_uint64_t last_id = 0;
 			const char *val;
-			unsigned long min_ts = 0;
-			if((val = evhttp_find_header(&query, "ts"))) {
-				min_ts = atoi(val);
+			if((val = evhttp_find_header(&query, "last")) && *val) {
+				last_id = atoi(val);
 			}
-			evbuffer *buf = evbuffer_new();
-			evbuffer_add_printf(buf, "[\n");
-			loopv(lastloglines) {
-				if(lastloglines[i].ts >= min_ts) {
-					evbuffer_add_printf(buf, "{ ");
-					evbuffer_add_json_prop(buf, "ts", (int)lastloglines[i].ts);
-					evbuffer_add_json_prop(buf, "line", lastloglines[i].line, false);
-					evbuffer_add_printf(buf, "}%c", i == lastloglines.length() - 1 ? ' ' : ',');
-				}
+			bool has = false;
+			loopv(lastloglines) if(lastloglines[i].id > last_id) has = true;
+			if(has) {
+				evbuffer *buf = evbuffer_new();
+				evbuffer_add_printf(buf, "[\n");
+				loopv(lastloglines) if(lastloglines[i].id > last_id) evbuffer_add_logline(buf, &lastloglines[i], i < lastloglines.length() - 1);
+				evbuffer_add_printf(buf, "]");
+				evhttp_send_reply(req, 200, "OK", buf);
+				evbuffer_free(buf);
+			} else {
+				evhttp_send_reply_start(req, 200, "OK");
+				chatreq &r = reqs.add();
+				r.req = req;
 			}
-			evbuffer_add_printf(buf, "]");
-			evhttp_send_reply(req, 200, "OK", buf);
-			evbuffer_free(buf);
 		} else evhttp_send_error(req, 404, "Not Found");
+	}
+
+	VAR(memlogsize, 0, 20, 1000);
+	void httplog(const char *line) {
+		// memory log
+		logline &l = lastloglines.add();
+		gettimeofday(&l.tv, NULL);
+		l.line = strdup(line);
+		l.id = loglineid++;
+		while(lastloglines.length() > memlogsize) {
+			if(lastloglines[0].line) free(lastloglines[0].line);
+			lastloglines.remove(0);
+		}
+		evbuffer *buf = evbuffer_new();
+		evbuffer_add_printf(buf, "[");
+		evbuffer_add_logline(buf, &l, false);
+		evbuffer_add_printf(buf, "]");
+		loopv(reqs) {
+			evhttp_send_reply_chunk(reqs[i].req, buf);
+			evhttp_send_reply_end(reqs[i].req);
+		}
+		evbuffer_free(buf);
+		reqs.shrink(0);
 	}
 
 	static void httpindexcb(struct evhttp_request *req, void *arg) {

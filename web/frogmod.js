@@ -128,7 +128,6 @@ function execute(c) {
 	update_info();
 	update_status();
 	update_players();
-	update_log();
 	return false;
 }
 
@@ -275,7 +274,7 @@ function update_players_cb(xhr) {
 							else
 								html.push('<a href="?command=spectator+1+'+players[p].clientnum+'" onclick="return execute(&quot;spectator 1 '+players[p].clientnum+'&quot;);" title="Spec"><img src="spec.png" alt="[S]"></a> ');
 							if(players[p].privilege)
-								html.push('<a href="?command=takemaster" title="Take master" onclick="return execute(&quot;takemaster&quot;);"><img src="takemaster.png" alt="[T]"</a> ');
+								html.push('<a href="?command=takemaster" title="Take master" onclick="return execute(&quot;takemaster&quot;);"><img src="takemaster.png" alt="[T]"></a> ');
 							else
 								html.push('<a href="?command=givemaster+'+players[p].clientnum+'" onclick="return execute(&quot;givemaster '+players[p].clientnum+'&quot;);" title="Give master"><img src="givemaster.png" alt="[M]"></a> ');
 							html.push('</td>');
@@ -296,34 +295,46 @@ function update_players(admin) {
 	ajaxCall('/players', admin ? function() { update_players_cb(this, true); } : function() { update_players_cb(this, false); });
 }
 
-var log_timeout = null;
-function update_log() {
-	if(log_timeout) { clearTimeout(log_timeout); log_timeout = null; }
-	ajaxCall('/log', function() {
+function append_div_log(s) {
+	var div = document.getElementById('log');
+	if(div) {
+		div.innerHTML += '<br>'+convert_cube_string(s);
+		div.scrollTop = div.scrollHeight;
+	}
+}
+
+var last_log_id = 0;
+function wait_log() {
+	document.body.style.cursor = 'default';
+	ajaxCall('/log?last='+last_log_id, function() {
+		document.body.style.cursor = 'default';
 		if(this.readyState == 4) {
-			var div = document.getElementById('log');
-			if(div) {
-				if(this.status == 200) {
+			if(this.status == 200) {
+				if(this.responseText) {
 					var log = eval('(' + this.responseText + ')');
-					var lines = new Array();
-					for(i in log) {
-						lines.push(convert_cube_string(log[i].line));
+					for(l in log) {
+						append_div_log(log[l].line);
+						last_log_id = log[l].id;
 					}
-					div.innerHTML = lines.join('<br>');
-				} else {
-					div.innerHTML = 'Error ' + (xhr.status ? xhr.status : '(unreachable)');
 				}
+				wait_log();
+			} else {
+				append_div_log('status = ' + this.status);
+				setTimeout(wait_log, 2000);
 			}
-			log_timeout = setTimeout(update_log, log_update_millis);
 		}
 	});
 }
 
-function init() {
+function init2() {
 	update_info();
 	update_status();
 	update_players();
 	var elm = document.getElementById('sayname');
 	if(elm) elm.value = readCookie('name');
-	if(admin) update_log();
+	if(admin) wait_log();
+}
+
+function init() {
+	setTimeout(init2, 500);
 }

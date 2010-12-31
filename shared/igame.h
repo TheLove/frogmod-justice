@@ -116,5 +116,6 @@ namespace server
     extern void processmasterinput(const char *cmd, int cmdlen, const char *args);
     extern bool ispaused();
     extern void gothostname(void *info);
+    extern void httplog(const char *line);
 }
 
