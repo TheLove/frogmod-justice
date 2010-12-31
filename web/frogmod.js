@@ -43,7 +43,7 @@ function ajaxCall(uri, cb) {
 		xhr=new ActiveXObject("Microsoft.XMLHTTP");
 	}
 	xhr.onreadystatechange = cb;
-	xhr.open('GET', uri + (uri.indexOf('?') > -1 ? '&' : '?') + Date(), true);
+	xhr.open('GET', uri + (uri.indexOf('?') > -1 ? '&' : '?') + 'date=' + Date(), true);
 	xhr.send();
 }
 

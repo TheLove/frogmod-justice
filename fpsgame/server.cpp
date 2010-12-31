@@ -720,9 +720,8 @@ namespace server
 	void kick_client(int cn, clientinfo *m = NULL);
 	static void httpadmincb(struct evhttp_request *req, void *arg) {
 		if(checkhttpauth(req)) {
-			struct evkeyvalq query;
-			evhttp_parse_query(evhttp_request_get_uri(req), &query);
-			// kick
+			evkeyvalq query;
+			evhttp_parse_query_str(evhttp_uri_get_query(evhttp_request_get_evhttp_uri(req)), &query);
 			const char *val;
 			if((val = evhttp_find_header(&query, "command"))) {
 				httpoutbuf = evbuffer_new();
@@ -764,10 +763,10 @@ namespace server
 
 	static void httplogcb(struct evhttp_request *req, void *arg) {
 		if(checkhttpauth(req)) {
-			struct evkeyvalq query;
-			evhttp_parse_query(evhttp_request_get_uri(req), &query);
-			ev_uint64_t last_id = 0;
+			evkeyvalq query;
+			evhttp_parse_query_str(evhttp_uri_get_query(evhttp_request_get_evhttp_uri(req)), &query);
 			const char *val;
+			ev_uint64_t last_id = 0;
 			if((val = evhttp_find_header(&query, "last")) && *val) {
 				last_id = atoi(val);
 			}
