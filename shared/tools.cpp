@@ -146,6 +146,22 @@ char *evbuffer_readln_nul(struct evbuffer *buffer, size_t *n_read_out, enum evbu
 	return result;
 }
 
+char *evbuffer2string(evbuffer *b) {
+	int len = evbuffer_get_length(b);
+	char *result;
+	if(!(result = (char *)malloc(len+1))) return NULL;
+	evbuffer_remove(b, result, len);
+	result[len] = 0;
+	evbuffer_free(b);
+	return result;
+}
+
+char *bvprintf(const char *fmt, va_list args) {
+	evbuffer *b = evbuffer_new();
+	evbuffer_add_vprintf(b, fmt, args);
+	return evbuffer2string(b);
+}
+
 #ifdef HAVE_PROC
 bool proc_get_mem_usage(int64_t *vmrss, int64_t *vmsize) {
 	int64_t vsz = -1, rss = -1;
