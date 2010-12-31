@@ -39,9 +39,9 @@ char irc2sauer[] = {
 	'4'  // 15
 };
 
-void color_irc2sauer(char *src, char *dst) {
+char *color_irc2sauer(char *src) {
 	char *c = src;
-	char *d = dst;
+	evbuffer *d = evbuffer_new();
 	//FIXME: use FSM logic instead
 	while(*c) {
 		if(*c == 3) {
@@ -53,13 +53,13 @@ void color_irc2sauer(char *src, char *dst) {
 				c++;
 				for(int i = 0; i < 2; i++) if(*(c) >= '0' && *(c) <= '9') c++;
 			}
-			*d++ = '\f';
-			if(color < 16) *d++ = irc2sauer[color];
+			evbuffer_add_printf(d, "\f");;
+			if(color < 16) evbuffer_add_printf(d, "%c", irc2sauer[color]);
 		} else if (*c == 2 || *c == 0x1F || *c == 0x16) c++; // skip bold, underline and italic
-		else if(*c == 0x0f) { *d++ = '\f'; *d++ = '7'; }
-		*d++ = *c++;
-		*d = 0;
+		else if(*c == 0x0f) { evbuffer_add_printf(d, "\f7"); }
+		evbuffer_add_printf(d, "%c", *c++);
 	}
+	return evbuffer2string(d);
 }
 
 char sauer2irc[] = {
@@ -72,8 +72,9 @@ char sauer2irc[] = {
 	7,
 	14
 };
-void color_sauer2irc(char *src, char *dst) {
-	char *c = src, *d = dst;
+char *color_sauer2irc(char *src) {
+	char *c = src;
+	evbuffer *d = evbuffer_new();
 	while(*c) {
 		if(*c == '\f') {
 			c++;
@@ -81,15 +82,11 @@ void color_sauer2irc(char *src, char *dst) {
 			if(col < 0) col = 0;
 			if(col > 7) col = 7;
 			col = sauer2irc[col];
-			if(col == 7) *d++ = 15;
-			else {
-				*d++ = 3;
-				*d++ = '0' + col / 10;
-				*d++ = '0' + col % 10;
-			}
-		} else *d++ = *c++;
-		*d = 0;
+			if(col == 7) evbuffer_add_printf(d, "%c", 15);
+			else evbuffer_add_printf(d, "\003%c%c", '0' + col / 10, '0' + col % 10);
+		} else evbuffer_add_printf(d, "%c", *c++);
 	}
+	return evbuffer2string(d);
 }
 
 char sauer2console[] = {
@@ -103,15 +100,17 @@ char sauer2console[] = {
 	7, // 7 white
 };
 
-void color_sauer2console(char *src, char *dst) {
-	copystring(dst, "\033[1;37m");
+char *color_sauer2console(char *src) {
+	evbuffer *d = evbuffer_new();
+	evbuffer_add_printf(d, "\033[1;37m");
 	for(char *c = src; *c; c++) {
 		if(*c == '\f') {
 			c++;
-			sprintf(dst + strlen(dst), "\033[1;%02dm", 30 + sauer2console[(*c >= '0' && *c <= '7') ? *c - '0' : 7]);
-		} else sprintf(dst + strlen(dst), "%c", *c);
+			evbuffer_add_printf(d, "\033[1;%02dm", 30 + sauer2console[(*c >= '0' && *c <= '7') ? *c - '0' : 7]);
+		} else evbuffer_add_printf(d, "%c", *c);
 	}
-	strcat(dst, "\033[0m");
+	evbuffer_add_printf(d, "\033[0m");
+	return evbuffer2string(d);
 }
 
 void fatal(const char *s, ...)

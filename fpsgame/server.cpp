@@ -648,7 +648,6 @@ namespace server
 		evbuffer_add_printf(buf, "}%s", comma ? "," : "");
 	}
 
-
 	void evhttp_request_redirect(evhttp_request *req, const char *url) {
 		evhttp_add_header(evhttp_request_get_output_headers(req), "Location", url);
 		evhttp_send_reply(req, 302, "Found", NULL);
@@ -973,9 +972,9 @@ namespace server
 	void processcommand(char *txt, int privilege = 0);
 	void ircmsgcb(IRC::Source *source, char *msg) {
 		if(NULL == strchr(frogchar, *msg)) {
-			string buf;
-			color_irc2sauer(msg, buf);
-			outf(1 | OUT_NOIRC, "\f4%s \f2<%s> \f7%s", source->channel?source->channel->alias:"", source->peer->nick, buf);
+			char *s = color_irc2sauer(msg);
+			outf(1 | OUT_NOIRC, "\f4%s \f2<%s> \f7%s", source->channel?source->channel->alias:"", source->peer->nick, s);
+			free(s);
 		} else {
 			scriptircsource = source;
 			if(source && source->peer && source->peer->data[0]) execute(msg+1);
@@ -992,9 +991,9 @@ namespace server
 	}
 
 	void ircactioncb(IRC::Source *source, char *msg) {
-		string buf;
-		color_irc2sauer(msg, buf);
-		outf(1 | OUT_NOIRC, "\f4%s \f1* %s \f7%s", source->channel->alias, source->peer->nick, msg);
+		char *s = color_irc2sauer(msg);
+		outf(1 | OUT_NOIRC, "\f4%s \f1* %s \f7%s", source->channel->alias, source->peer->nick, s);
+		free(s);
 	}
 	void ircnoticecb(IRC::Server *s, char *prefix, char *trailing) {
 		if(prefix) outf(2 | OUT_NOIRC, "\f2[%s]\f1 -%s- %s\f7", s->alias, prefix, trailing);
@@ -1030,9 +1029,9 @@ namespace server
 		evbuffer_free(eb);
 	}
 	ICOMMAND(ircecho, "C", (const char *msg), {
-		string buf;
-		color_sauer2irc((char *)msg, buf);
-		if(scriptircsource) scriptircsource->speak(buf);
+		char *s = color_sauer2irc((char *)msg);
+		if(scriptircsource) scriptircsource->speak(s);
+		free(s);
 	});
 
 	void ircinit() {
@@ -1948,15 +1947,14 @@ namespace server
 	void irctopic(const char *fmt, ...) {
 		va_list ap;
 		va_start(ap, fmt);
-		for(unsigned int i = 0; i < irc.servers.size(); i++) {
-			for(unsigned int j = 0; j < irc.servers[i]->channels.size(); j++) {
-				string topic, colortopic;
-				vformatstring(topic, fmt, ap);
-				color_sauer2irc(topic, colortopic);
-				irc.servers[i]->raw("TOPIC %s :%s\n", irc.servers[i]->channels[j]->name, colortopic);
-			}
-		}
+		char *s = bvprintf(fmt, ap);
+		char *cs = color_sauer2irc(s);
+		free(s);
 		va_end(ap);
+		for(unsigned int i = 0; i < irc.servers.size(); i++)
+			for(unsigned int j = 0; j < irc.servers[i]->channels.size(); j++)
+				irc.servers[i]->raw("TOPIC %s :%s\n", irc.servers[i]->channels[j]->name, cs);
+		free(cs);
 	}
 	ICOMMAND(irctopic, "s", (char *t), irctopic("%s", t););
 
@@ -2919,13 +2917,13 @@ namespace server
 		if(httpoutbuf) evbuffer_add_printf(httpoutbuf, "%s", s);
 		else if(scriptclient) whisper(scriptclient->clientnum, "%s", s);
 		else if(scriptircsource) {
-			string buf;
-			color_sauer2irc(s, buf);
-			scriptircsource->reply("%s", buf);
+			char *cs = color_sauer2irc(s);
+			scriptircsource->reply("%s", cs);
+			free(cs);
 		} else {
-			string buf;
-			color_sauer2console(s, buf);
-			printf("%s\n", buf);
+			char *cs = color_sauer2console(s);
+			puts(cs);
+			free(cs);
 		}
 	});
 
@@ -3007,7 +3005,6 @@ namespace server
 						execthis = newstring(len + 1);
 						evbuffer_remove(buf, execthis, len);
 						execthis[len] = 0;
-						printf("execthis [%s]\n", execthis);
 						execute(execthis);
 						delete[] execthis;
 					}

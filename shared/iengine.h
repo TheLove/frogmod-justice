@@ -485,6 +485,6 @@ extern void g3d_resetcursor();
 extern void g3d_limitscale(float scale);
 
 extern IRC::Client irc;
-void color_irc2sauer(char *src, char *dst);
-void color_sauer2irc(char *src, char *dst);
-void color_sauer2console(char *src, char *dst);
+char *color_irc2sauer(char *src);
+char *color_sauer2irc(char *src);
+char *color_sauer2console(char *src);

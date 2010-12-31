@@ -968,6 +968,9 @@ void evdns_print_error(int result, const char *fmt, ...);
 void bufferevent_write_printf(struct bufferevent *be, const char *fmt, ...);
 void bufferevent_write_vprintf(struct bufferevent *be, const char *fmt, va_list ap);
 char *evbuffer_readln_nul(struct evbuffer *buffer, size_t *n_read_out, enum evbuffer_eol_style eol_style);
+// allocates memory for string, copies string into memory, frees evbuffer, returns string. string needs to be free()'d manually.
+char *evbuffer2string(evbuffer *b);
+char *bvprintf(const char *fmt, va_list args);
 
 /**
  * structure to hold parsed uri
