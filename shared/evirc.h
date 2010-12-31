@@ -44,6 +44,9 @@ struct Channel {
 	int verbosity;
 	Server *server;
 
+	Channel(Server *serv, const char *channel, int verbosity_=0, const char *alias_=NULL, const char *pwd_=NULL);
+	~Channel();
+
 	ChannelPeer *peerjoin(char *peername);
 	void peerpart(char *nick);
 
@@ -87,7 +90,7 @@ struct Server {
 		for(unsigned int i = 0; i < channels.size(); i++) {
 			if(!strcasecmp(channels[i]->name, name)) return channels[i];
 		}
-		return NULL;
+		return new Channel(this, name);
 	}
 
 	Peer *addpeer(char *peername);

@@ -97,17 +97,7 @@ void Server::join(const char *channel, int verbosity_, const char *alias_, const
 		if(!strcmp(channels[i]->name, channel)) c = channels[i]; // don't join an existing channel
 	}
 	if(!c) {
-		c = new Channel;
-		c->name = strdup(channel);
-		if(alias_) c->alias = strdup(alias_);
-		else {
-			char buf[512];
-			sprintf(buf, "%s %s", alias, channel);
-			c->alias = strdup(buf);
-		}
-		c->server = this;
-		c->verbosity = verbosity_;
-		c->pwd = (pwd_&&*pwd_)?strdup(pwd_):NULL;
+		c = new Channel(this, channel, verbosity_, alias_, pwd_);
 		channels.push_back(c);
 	}
 	if(state == Active)
@@ -434,6 +424,25 @@ void Server::delpeer(Peer *p) {
 	}
 }
 
+Channel::Channel(Server *serv, const char *channel, int verbosity_, const char *alias_, const char *pwd_) {
+	name = strdup(channel);
+	if(alias_) alias = strdup(alias_);
+	else {
+		char buf[512];
+		snprintf(buf, 512, "%s %s", serv->alias, channel);
+		alias = strdup(buf);
+	}
+	server = serv;
+	verbosity = verbosity_;
+	pwd = (pwd_&&*pwd_)?strdup(pwd_):NULL;
+}
+
+Channel::~Channel() {
+	if(name) free(name);
+	if(alias) free(alias);
+	if(pwd) free(pwd);
+}
+
 ChannelPeer *Channel::peerjoin(char *nick) {
 	while(*nick && (*nick == '@' || *nick == '+')) nick++; // strip privileges. FIXME: get prefixes from server info string
 	Peer *p = server->addpeer(nick);
@@ -449,7 +458,6 @@ ChannelPeer *Channel::peerjoin(char *nick) {
 			return cp;
 		}
 	}
-
 	return NULL;
 }
 
