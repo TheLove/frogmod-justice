@@ -525,10 +525,10 @@ conn_closed(struct bufferevent_openssl *bev_ssl, int errcode, int ret)
 	if (dirty_shutdown && bev_ssl->allow_dirty_shutdown)
 		event = BEV_EVENT_EOF;
 
-	_bufferevent_run_eventcb(&bev_ssl->bev.bev, event);
-
 	stop_reading(bev_ssl);
 	stop_writing(bev_ssl);
+
+	_bufferevent_run_eventcb(&bev_ssl->bev.bev, event);
 }
 
 static void
@@ -732,6 +732,14 @@ consider_reading(struct bufferevent_openssl *bev_ssl)
 		if (r <= 0)
 			break;
 	}
+
+	if (!bev_ssl->underlying) {
+		/* Should be redundant, but let's avoid busy-looping */
+		if (bev_ssl->bev.read_suspended ||
+		    !(bev_ssl->bev.bev.enabled & EV_READ)) {
+			event_del(&bev_ssl->bev.bev.ev_read);
+		}
+	}
 }
 
 static void
@@ -767,8 +775,15 @@ consider_writing(struct bufferevent_openssl *bev_ssl)
 			break;
 	}
 
-	if (!bev_ssl->underlying && !evbuffer_get_length(output))
-		event_del(&bev_ssl->bev.bev.ev_write);
+	if (!bev_ssl->underlying) {
+		if (evbuffer_get_length(output) == 0) {
+			event_del(&bev_ssl->bev.bev.ev_write);
+		} else if (bev_ssl->bev.write_suspended ||
+		    !(bev_ssl->bev.bev.enabled & EV_WRITE)) {
+			/* Should be redundant, but let's avoid busy-looping */
+			event_del(&bev_ssl->bev.bev.ev_write);
+		}
+	}
 }
 
 static void
@@ -1071,8 +1086,23 @@ be_openssl_destruct(struct bufferevent *bev)
 				bufferevent_free(bev_ssl->underlying);
 				bev_ssl->underlying = NULL;
 			}
+		} else {
+			evutil_socket_t fd = -1;
+			BIO *bio = SSL_get_wbio(bev_ssl->ssl);
+			if (bio)
+				fd = BIO_get_fd(bio, NULL);
+			if (fd >= 0)
+				evutil_closesocket(fd);
 		}
 		SSL_free(bev_ssl->ssl);
+	} else {
+		if (bev_ssl->underlying) {
+			if (bev_ssl->underlying->errorcb == be_openssl_eventcb)
+				bufferevent_setcb(bev_ssl->underlying,
+				    NULL,NULL,NULL,NULL);
+			bufferevent_unsuspend_read(bev_ssl->underlying,
+			    BEV_SUSPEND_FILT_READ);
+		}
 	}
 }
 
@@ -1111,11 +1141,8 @@ be_openssl_ctrl(struct bufferevent *bev,
 		if (bev_ssl->underlying)
 			return -1;
 		{
-			int flag = 0;
 			BIO *bio;
-			if (bev_ssl->bev.options & BEV_OPT_CLOSE_ON_FREE)
-				flag = 1;
-			bio = BIO_new_socket(data->fd, flag);
+			bio = BIO_new_socket(data->fd, 0);
 			SSL_set_bio(bev_ssl->ssl, bio, bio);
 			bev_ssl->fd_is_set = 1;
 		}
@@ -1271,7 +1298,6 @@ bufferevent_openssl_socket_new(struct event_base *base,
 	/* Does the SSL already have an fd? */
 	BIO *bio = SSL_get_wbio(ssl);
 	long have_fd = -1;
-	const int shutdown_flag = !!(options & BEV_OPT_CLOSE_ON_FREE);
 
 	if (bio)
 		have_fd = BIO_get_fd(bio, NULL);
@@ -1288,12 +1314,12 @@ bufferevent_openssl_socket_new(struct event_base *base,
 			   This is probably an error on our part.  Fail. */
 			return NULL;
 		}
-		(void) BIO_set_close(bio, shutdown_flag);
+		(void) BIO_set_close(bio, 0);
 	} else {
 		/* The SSL isn't configured with a BIO with an fd. */
 		if (fd >= 0) {
 			/* ... and we have an fd we want to use. */
-			bio = BIO_new_socket(fd, shutdown_flag);
+			bio = BIO_new_socket(fd, 0);
 			SSL_set_bio(ssl, bio, bio);
 		} else {
 			/* Leave the fd unset. */

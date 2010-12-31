@@ -134,7 +134,7 @@ static void	event_queue_insert(struct event_base *, struct event *, int);
 static void	event_queue_remove(struct event_base *, struct event *, int);
 static int	event_haveevents(struct event_base *);
 
-static void	event_process_active(struct event_base *);
+static int	event_process_active(struct event_base *);
 
 static int	timeout_next(struct event_base *, struct timeval **);
 static void	timeout_process(struct event_base *);
@@ -187,9 +187,9 @@ static HT_HEAD(event_debug_map, event_debug_entry) global_debug_map =
 	HT_INITIALIZER();
 
 HT_PROTOTYPE(event_debug_map, event_debug_entry, node, hash_debug_entry,
-    eq_debug_entry);
+    eq_debug_entry)
 HT_GENERATE(event_debug_map, event_debug_entry, node, hash_debug_entry,
-    eq_debug_entry, 0.5, mm_malloc, mm_realloc, mm_free);
+    eq_debug_entry, 0.5, mm_malloc, mm_realloc, mm_free)
 
 /* Macro: record that ev is now setup (that is, ready for an add) */
 #define _event_debug_note_setup(ev) do {				\
@@ -824,7 +824,7 @@ event_reinit(struct event_base *base)
 			if (evmap_io_add(base, ev->ev_fd, ev) == -1)
 				res = -1;
 		} else if (ev->ev_events & EV_SIGNAL) {
-			if (evmap_signal_add(base, ev->ev_fd, ev) == -1)
+			if (evmap_signal_add(base, (int)ev->ev_fd, ev) == -1)
 				res = -1;
 		}
 	}
@@ -1151,7 +1151,7 @@ event_base_init_common_timeout(struct event_base *base,
 		}
 	}
 	if (base->n_common_timeouts == MAX_COMMON_TIMEOUTS) {
-		event_warn("%s: Too many common timeouts already in use; "
+		event_warnx("%s: Too many common timeouts already in use; "
 		    "we only support %d per event_base", __func__,
 		    MAX_COMMON_TIMEOUTS);
 		goto done;
@@ -1341,19 +1341,19 @@ event_process_deferred_callbacks(struct deferred_cb_queue *queue, int *breakptr)
  * priority ones.
  */
 
-static void
+static int
 event_process_active(struct event_base *base)
 {
 	/* Caller must hold th_base_lock */
 	struct event_list *activeq = NULL;
-	int i, c;
+	int i, c = 0;
 
 	for (i = 0; i < base->nactivequeues; ++i) {
 		if (TAILQ_FIRST(&base->activequeues[i]) != NULL) {
 			activeq = &base->activequeues[i];
 			c = event_process_active_single_queue(base, activeq);
 			if (c < 0)
-				return;
+				return -1;
 			else if (c > 0)
 				break; /* Processed a real event; do not
 					* consider lower-priority events */
@@ -1363,6 +1363,7 @@ event_process_active(struct event_base *base)
 	}
 
 	event_process_deferred_callbacks(&base->defer_queue,&base->event_break);
+	return c;
 }
 
 /*
@@ -1477,7 +1478,7 @@ event_base_loop(struct event_base *base, int flags)
 	EVBASE_ACQUIRE_LOCK(base, th_base_lock);
 
 	if (base->running_loop) {
-		event_warn("%s: reentrant invocation.  Only one event_base_loop"
+		event_warnx("%s: reentrant invocation.  Only one event_base_loop"
 		    " can run on each event_base at once.", __func__);
 		EVBASE_RELEASE_LOCK(base, th_base_lock);
 		return -1;
@@ -1547,8 +1548,10 @@ event_base_loop(struct event_base *base, int flags)
 		timeout_process(base);
 
 		if (N_ACTIVE_CALLBACKS(base)) {
-			event_process_active(base);
-			if (!base->event_count_active && (flags & EVLOOP_ONCE))
+			int n = event_process_active(base);
+			if ((flags & EVLOOP_ONCE)
+			    && N_ACTIVE_CALLBACKS(base) == 0
+			    && n != 0)
 				done = 1;
 		} else if (flags & EVLOOP_NONBLOCK)
 			done = 1;
@@ -1804,15 +1807,11 @@ event_pending(const struct event *ev, short event, struct timeval *tv)
 }
 
 int
-_event_initialized(const struct event *ev, int need_fd)
+event_initialized(const struct event *ev)
 {
 	if (!(ev->ev_flags & EVLIST_INIT))
 		return 0;
-#ifdef WIN32
-	/* XXX Is this actually a sensible thing to check? -NM */
-	if (need_fd && (ev)->ev_fd == (evutil_socket_t)INVALID_HANDLE_VALUE)
-		return 0;
-#endif
+
 	return 1;
 }
 
@@ -1995,7 +1994,7 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 		if (ev->ev_events & (EV_READ|EV_WRITE))
 			res = evmap_io_add(base, ev->ev_fd, ev);
 		else if (ev->ev_events & EV_SIGNAL)
-			res = evmap_signal_add(base, ev->ev_fd, ev);
+			res = evmap_signal_add(base, (int)ev->ev_fd, ev);
 		if (res != -1)
 			event_queue_insert(base, ev, EVLIST_INSERTED);
 		if (res == 1) {
@@ -2173,7 +2172,7 @@ event_del_internal(struct event *ev)
 		if (ev->ev_events & (EV_READ|EV_WRITE))
 			res = evmap_io_del(base, ev->ev_fd, ev);
 		else
-			res = evmap_signal_del(base, ev->ev_fd, ev);
+			res = evmap_signal_del(base, (int)ev->ev_fd, ev);
 		if (res == 1) {
 			/* evmap says we need to notify the main thread. */
 			notify = 1;
@@ -2241,6 +2240,9 @@ event_active_nolock(struct event *ev, int res, short ncalls)
 	}
 
 	event_queue_insert(base, ev, EVLIST_ACTIVE);
+
+	if (EVBASE_NEED_NOTIFY(base))
+		evthread_notify_base(base);
 }
 
 void
@@ -2676,8 +2678,12 @@ evthread_make_base_notifiable(struct event_base *base)
 		return 0;
 
 #if defined(_EVENT_HAVE_EVENTFD) && defined(_EVENT_HAVE_SYS_EVENTFD_H)
-	base->th_notify_fd[0] = eventfd(0, 0);
+#ifndef EFD_CLOEXEC
+#define EFD_CLOEXEC 0
+#endif
+	base->th_notify_fd[0] = eventfd(0, EFD_CLOEXEC);
 	if (base->th_notify_fd[0] >= 0) {
+		evutil_make_socket_closeonexec(base->th_notify_fd[0]);
 		notify = evthread_notify_base_eventfd;
 		cb = evthread_notify_drain_eventfd;
 	}
@@ -2685,8 +2691,12 @@ evthread_make_base_notifiable(struct event_base *base)
 #if defined(_EVENT_HAVE_PIPE)
 	if (base->th_notify_fd[0] < 0) {
 		if ((base->evsel->features & EV_FEATURE_FDS)) {
-			if (pipe(base->th_notify_fd) < 0)
+			if (pipe(base->th_notify_fd) < 0) {
 				event_warn("%s: pipe", __func__);
+			} else {
+				evutil_make_socket_closeonexec(base->th_notify_fd[0]);
+				evutil_make_socket_closeonexec(base->th_notify_fd[1]);
+			}
 		}
 	}
 #endif
@@ -2701,6 +2711,9 @@ evthread_make_base_notifiable(struct event_base *base)
 			base->th_notify_fd) == -1) {
 			event_sock_warn(-1, "%s: socketpair", __func__);
 			return (-1);
+		} else {
+			evutil_make_socket_closeonexec(base->th_notify_fd[0]);
+			evutil_make_socket_closeonexec(base->th_notify_fd[1]);
 		}
 	}
 

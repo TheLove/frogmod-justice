@@ -4,7 +4,7 @@ ulimit -c unlimited
 
 while true; do
 echo 'Starting ./frogserv'
-./frogserv
+valgrind -v --leak-check=full --show-reachable=yes ./frogserv 2>&1 | tee frogserv-valgrind-`date +"%F_%H-%M-%S"`.log
 mv core core-`date +"%F_%H-%M-%S"`
 if [ ! -z $1 ]; then
 /usr/sbin/sendmail -t "$1" << EOF

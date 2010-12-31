@@ -72,7 +72,7 @@
 #include "regress.gen.h"
 #endif
 
-int pair[2];
+evutil_socket_t pair[2];
 int test_ok;
 int called;
 struct event_base *global_base;
@@ -94,8 +94,8 @@ static struct timeval tcalled;
 #endif
 
 #ifdef WIN32
-#define write(fd,buf,len) send((fd),(buf),(len),0)
-#define read(fd,buf,len) recv((fd),(buf),(len),0)
+#define write(fd,buf,len) send((fd),(buf),(int)(len),0)
+#define read(fd,buf,len) recv((fd),(buf),(int)(len),0)
 #endif
 
 struct basic_cb_args
@@ -686,8 +686,6 @@ end:
 	event_del(&ev);
 }
 
-static int total_common_counts;
-
 struct common_timeout_info {
 	struct event ev;
 	struct timeval called_at;
@@ -730,8 +728,6 @@ test_common_timeout(void *ptr)
 	tt_int_op(ms_200->tv_sec, ==, 0);
 	tt_int_op(ms_100->tv_usec, ==, 100000|0x50000000);
 	tt_int_op(ms_200->tv_usec, ==, 200000|0x50100000);
-
-	total_common_counts = 0;
 
 	memset(info, 0, sizeof(info));
 
@@ -1272,7 +1268,7 @@ test_event_base_new(void *ptr)
 	struct event ev1;
 	struct basic_cb_args args;
 
-	int towrite = strlen(TEST1)+1;
+	int towrite = (int)strlen(TEST1)+1;
 	int len = write(data->pair[0], TEST1, towrite);
 
 	if (len < 0)
@@ -1415,10 +1411,9 @@ static void
 re_add_read_cb(evutil_socket_t fd, short event, void *arg)
 {
 	char buf[256];
-	int len;
 	struct event *ev_other = arg;
 	readd_test_event_last_added = ev_other;
-	len = read(fd, buf, sizeof(buf));
+	(void) read(fd, buf, sizeof(buf));
 	event_add(ev_other, NULL);
 	++test_ok;
 }
@@ -1427,13 +1422,12 @@ static void
 test_nonpersist_readd(void)
 {
 	struct event ev1, ev2;
-	int n, m;
 
 	setup_test("Re-add nonpersistent events: ");
 	event_set(&ev1, pair[0], EV_READ, re_add_read_cb, &ev2);
 	event_set(&ev2, pair[1], EV_READ, re_add_read_cb, &ev1);
-	n = write(pair[0], "Hello", 5);
-	m = write(pair[1], "Hello", 5);
+	(void) write(pair[0], "Hello", 5);
+	(void) write(pair[1], "Hello", 5);
 	if (event_add(&ev1, NULL) == -1 ||
 	    event_add(&ev2, NULL) == -1) {
 		test_ok = 0;
@@ -1646,9 +1640,9 @@ evtag_int_test(void *ptr)
 
 	for (i = 0; i < TEST_MAX_INT; i++) {
 		int oldlen, newlen;
-		oldlen = EVBUFFER_LENGTH(tmp);
+		oldlen = (int)EVBUFFER_LENGTH(tmp);
 		evtag_encode_int(tmp, integers[i]);
-		newlen = EVBUFFER_LENGTH(tmp);
+		newlen = (int)EVBUFFER_LENGTH(tmp);
 		TT_BLATHER(("encoded 0x%08x with %d bytes",
 			(unsigned)integers[i], newlen - oldlen));
 		big_int = integers[i];
@@ -1723,9 +1717,9 @@ evtag_tag_encoding(void *ptr)
 
 	for (i = 0; i < TEST_MAX_INT; i++) {
 		int oldlen, newlen;
-		oldlen = EVBUFFER_LENGTH(tmp);
+		oldlen = (int)EVBUFFER_LENGTH(tmp);
 		evtag_encode_tag(tmp, integers[i]);
-		newlen = EVBUFFER_LENGTH(tmp);
+		newlen = (int)EVBUFFER_LENGTH(tmp);
 		TT_BLATHER(("encoded 0x%08x with %d bytes",
 			(unsigned)integers[i], newlen - oldlen));
 	}
@@ -1900,9 +1894,9 @@ test_base_environ(void *arg)
 
 #if defined(SETENV_OK) && defined(UNSETENV_OK)
 	const char **basenames;
-	char varbuf[128];
 	int i, n_methods=0;
-	const char *defaultname;
+	char varbuf[128];
+	const char *defaultname, *ignoreenvname;
 
 	/* See if unsetenv works before we rely on it. */
 	setenv("EVENT_NOWAFFLES", "1", 1);
@@ -1932,8 +1926,14 @@ test_base_environ(void *arg)
 	base = NULL;
 
 	/* Can we disable the method with EVENT_NOfoo ? */
-	methodname_to_envvar(defaultname, varbuf, sizeof(varbuf));
-	setenv(varbuf, "1", 1);
+	if (!strcmp(defaultname, "epoll (with changelist)")) {
+ 		setenv("EVENT_NOEPOLL", "1", 1);
+		ignoreenvname = "epoll";
+	} else {
+		methodname_to_envvar(defaultname, varbuf, sizeof(varbuf));
+		setenv(varbuf, "1", 1);
+		ignoreenvname = defaultname;
+	}
 
 	/* Use an empty cfg rather than NULL so a failure doesn't exit() */
 	cfg = event_config_new();
@@ -1954,7 +1954,7 @@ test_base_environ(void *arg)
 	event_config_set_flag(cfg, EVENT_BASE_FLAG_IGNORE_ENV);
 	base = event_base_new_with_config(cfg);
 	tt_assert(base);
-	tt_str_op(defaultname, ==, event_base_get_method(base));
+	tt_str_op(ignoreenvname, ==, event_base_get_method(base));
 #else
 	tt_skip();
 #endif
@@ -2060,6 +2060,76 @@ end:
 		event_free(t);
 	}
 }
+
+#ifndef WIN32
+/* You can't do this test on windows, since dup2 doesn't work on sockets */
+
+static void
+dfd_cb(evutil_socket_t fd, short e, void *data)
+{
+	*(int*)data = (int)e;
+}
+
+/* Regression test for our workaround for a fun epoll/linux related bug
+ * where fd2 = dup(fd1); add(fd2); close(fd2); dup2(fd1,fd2); add(fd2)
+ * will get you an EEXIST */
+static void
+test_dup_fd(void *arg)
+{
+	struct basic_test_data *data = arg;
+	struct event_base *base = data->base;
+	struct event *ev1=NULL, *ev2=NULL;
+	int fd, dfd=-1;
+	int ev1_got, ev2_got;
+
+	tt_int_op(write(data->pair[0], "Hello world",
+		strlen("Hello world")), >, 0);
+	fd = data->pair[1];
+
+	dfd = dup(fd);
+	tt_int_op(dfd, >=, 0);
+
+	ev1 = event_new(base, fd, EV_READ|EV_PERSIST, dfd_cb, &ev1_got);
+	ev2 = event_new(base, dfd, EV_READ|EV_PERSIST, dfd_cb, &ev2_got);
+	ev1_got = ev2_got = 0;
+	event_add(ev1, NULL);
+	event_add(ev2, NULL);
+	event_base_loop(base, EVLOOP_ONCE);
+	tt_int_op(ev1_got, ==, EV_READ);
+	tt_int_op(ev2_got, ==, EV_READ);
+
+	/* Now close and delete dfd then dispatch.  We need to do the
+	 * dispatch here so that when we add it later, we think there
+	 * was an intermediate delete. */
+	close(dfd);
+	event_del(ev2);
+	ev1_got = ev2_got = 0;
+	event_base_loop(base, EVLOOP_ONCE);
+	tt_want_int_op(ev1_got, ==, EV_READ);
+	tt_int_op(ev2_got, ==, 0);
+
+	/* Re-duplicate the fd.  We need to get the same duplicated
+	 * value that we closed to provoke the epoll quirk.  Also, we
+	 * need to change the events to write, or else the old lingering
+	 * read event will make the test pass whether the change was
+	 * successful or not. */
+	tt_int_op(dup2(fd, dfd), ==, dfd);
+	event_free(ev2);
+	ev2 = event_new(base, dfd, EV_WRITE|EV_PERSIST, dfd_cb, &ev2_got);
+	event_add(ev2, NULL);
+	ev1_got = ev2_got = 0;
+	event_base_loop(base, EVLOOP_ONCE);
+	tt_want_int_op(ev1_got, ==, EV_READ);
+	tt_int_op(ev2_got, ==, EV_WRITE);
+
+end:
+	if (ev1)
+		event_free(ev1);
+	if (ev2)
+		event_free(ev2);
+	close(dfd);
+}
+#endif
 
 #ifdef _EVENT_DISABLE_MM_REPLACEMENT
 static void
@@ -2229,6 +2299,9 @@ struct testcase_t main_testcases[] = {
 	{ "event_once", test_event_once, TT_ISOLATED, &basic_setup, NULL },
 	{ "event_pending", test_event_pending, TT_ISOLATED, &basic_setup,
 	  NULL },
+#ifndef WIN32
+	{ "dup_fd", test_dup_fd, TT_ISOLATED, &basic_setup, NULL },
+#endif
 	{ "mm_functions", test_mm_functions, TT_FORK, NULL, NULL },
 	BASIC(many_events, TT_ISOLATED),
 

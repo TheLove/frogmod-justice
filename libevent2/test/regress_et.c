@@ -24,7 +24,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <event2/event-config.h>
+#include "event2/event-config.h"
 
 #ifdef WIN32
 #include <winsock2.h>
@@ -44,8 +44,8 @@
 #endif
 #include <errno.h>
 
-#include <event2/event.h>
-#include <event2/util.h>
+#include "event2/event.h"
+#include "event2/util.h"
 
 #include "regress.h"
 
@@ -89,7 +89,6 @@ test_edgetriggered(void *et)
 	const char *test = "test string";
 	evutil_socket_t pair[2] = {-1,-1};
 	int supports_et;
-	int success;
 
 	if (evutil_socketpair(LOCAL_SOCKETPAIR_AF, SOCK_STREAM, 0, pair) == -1) {
 		tt_abort_perror("socketpair");
@@ -97,14 +96,15 @@ test_edgetriggered(void *et)
 
 	called = was_et = 0;
 
-	send(pair[0], test, strlen(test)+1, 0);
+	send(pair[0], test, (int)strlen(test)+1, 0);
 	shutdown(pair[0], SHUT_WR);
 
 	/* Initalize the event library */
 	base = event_base_new();
 
 	if (!strcmp(event_base_get_method(base), "epoll") ||
-		!strcmp(event_base_get_method(base), "kqueue"))
+	    !strcmp(event_base_get_method(base), "epoll (with changelist)") ||
+	    !strcmp(event_base_get_method(base), "kqueue"))
 		supports_et = 1;
 	else
 		supports_et = 0;
@@ -134,8 +134,6 @@ test_edgetriggered(void *et)
 	} else {
 		tt_int_op(called, ==, 2);
 		tt_assert(!was_et);
-		success = (called == 2) && !was_et;
-
 	}
 
  end:

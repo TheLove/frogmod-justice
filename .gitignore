@@ -2,7 +2,9 @@ frogserv
 config.h
 config.mk
 
+*.log
 core.*
+vgcore.*
 
 server-init.cfg
 config.cfg

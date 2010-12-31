@@ -972,50 +972,6 @@ char *evbuffer_readln_nul(struct evbuffer *buffer, size_t *n_read_out, enum evbu
 char *evbuffer2string(evbuffer *b);
 char *bvprintf(const char *fmt, va_list args);
 
-/**
- * structure to hold parsed uri
- */
-struct evhttp_uri {
-	char *scheme; /* scheme; e.g http, ftp etc */
-	char *host; /* hostname, or NULL */
-	char *user; /* usename, or NULL */
-	char *pass; /* password, or NULL */
-	int port; /* port, or zero */
-	char *query; /* path + query: e.g. /path/to?param=foo, or NULL */
-	char *fragment; /* fragment or NULL */
-};
-
-/**
-   Helper function to parse out uri.
-
-   Parsing a uri like
-
-      scheme://[[user[:pass]@]foo.com[:port]]/[path][?q=test&s=some+thing][#fragment]
-
-   @param source_uri the request URI
-   @return uri container to hold parsed data, or NULL if there is error
-   @see evhttp_uri_free()
- */
-struct evhttp_uri *evhttp_uri_parse(const char *source_uri);
-
-/**
- * Free the memory allocated for the uri and parsed data
- * @param uri container with parsed data
-   @see evhttp_uri_parse()
- */
-void evhttp_uri_free(struct evhttp_uri *uri);
-
-/**
- * Join together the uri parts from parsed data
- * @param uri container with parsed data
- * @param buf destination buffer
- * @param limit destination buffer size
- * @return an joined uri as string or NULL on error
-   @see evhttp_uri_parse()
- */
-char *evhttp_uri_join(struct evhttp_uri *uri, void *buf, size_t limit);
-
-
 # ifdef HAVE_PROC
 bool proc_get_mem_usage(int64_t *vmrss, int64_t *vmsize);
 void print_mem_usage(const char *pfx = "");

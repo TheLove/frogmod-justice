@@ -25,8 +25,8 @@
 #include <string.h>
 #include <errno.h>
 
-#include <event2/event.h>
-#include <event2/util.h>
+#include "event2/event.h"
+#include "event2/util.h"
 #include <time.h>
 
 struct cpu_usage_timer {
@@ -143,8 +143,7 @@ main(int argc, char **argv)
 	struct event* timeout;
 	struct event_base* base;
 
-	int pair[2];
-	int res;
+	evutil_socket_t pair[2];
 	struct timeval tv;
 	struct cpu_usage_timer timer;
 
@@ -179,7 +178,7 @@ main(int argc, char **argv)
 
 	start_cpu_usage_timer(&timer);
 
-	res = event_base_dispatch(base);
+	event_base_dispatch(base);
 
 	get_cpu_usage(&timer, &secPassed, &secUsed, &usage);
 

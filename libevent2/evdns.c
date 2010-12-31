@@ -68,16 +68,16 @@
 #include <shlobj.h>
 #endif
 
-#include <event2/dns.h>
-#include <event2/dns_struct.h>
-#include <event2/dns_compat.h>
-#include <event2/util.h>
-#include <event2/event.h>
-#include <event2/event_struct.h>
-#include <event2/thread.h>
+#include "event2/dns.h"
+#include "event2/dns_struct.h"
+#include "event2/dns_compat.h"
+#include "event2/util.h"
+#include "event2/event.h"
+#include "event2/event_struct.h"
+#include "event2/thread.h"
 
-#include <event2/bufferevent.h>
-#include <event2/bufferevent_struct.h>
+#include "event2/bufferevent.h"
+#include "event2/bufferevent_struct.h"
 #include "bufferevent-internal.h"
 
 #include "defer-internal.h"
@@ -139,10 +139,14 @@
 
 /* Persistent handle.  We keep this separate from 'struct request' since we
  * need some object to last for as long as an evdns_request is outstanding so
- * that it can be cancelled, whereas a search request can lead to multiple
+ * that it can be canceled, whereas a search request can lead to multiple
  * 'struct request' instances being created over its lifetime. */
 struct evdns_request {
 	struct request *current_req;
+	struct evdns_base *base;
+
+	int pending_cb; /* Waiting for its callback to be invoked; not
+			 * owned by event base any more. */
 
 	/* elements used by the searching code */
 	int search_index;
@@ -634,8 +638,7 @@ request_finished(struct request *const req, struct request **head, int free_hand
 	if (head)
 		evdns_request_remove(req, head);
 
-	log(EVDNS_LOG_DEBUG, "Removing timeout for request %lx",
-	    (unsigned long) req);
+	log(EVDNS_LOG_DEBUG, "Removing timeout for request %p", req);
 	if (was_inflight) {
 		evtimer_del(&req->timeout_event);
 		base->global_requests_inflight--;
@@ -653,11 +656,20 @@ request_finished(struct request *const req, struct request **head, int free_hand
 
 	if (req->handle) {
 		EVUTIL_ASSERT(req->handle->current_req == req);
+
 		if (free_handle) {
 			search_request_finished(req->handle);
-			mm_free(req->handle);
-		} else
 			req->handle->current_req = NULL;
+			if (! req->handle->pending_cb) {
+				/* If we're planning to run the callback,
+				 * don't free the handle until later. */
+				mm_free(req->handle);
+			}
+			req->handle = NULL; /* If we have a bug, let's crash
+					     * early */
+		} else {
+			req->handle->current_req = NULL;
+		}
 	}
 
 	mm_free(req);
@@ -723,6 +735,7 @@ evdns_requests_pump_waiting_queue(struct evdns_base *base) {
 /* TODO(nickm) document */
 struct deferred_reply_callback {
 	struct deferred_cb deferred;
+	struct evdns_request *handle;
 	u8 request_type;
 	u8 have_reply;
 	u32 ttl;
@@ -769,6 +782,10 @@ reply_run_callback(struct deferred_cb *d, void *user_pointer)
 		EVUTIL_ASSERT(0);
 	}
 
+	if (cb->handle && cb->handle->pending_cb) {
+		mm_free(cb->handle);
+	}
+
 	mm_free(cb);
 }
 
@@ -786,6 +803,11 @@ reply_schedule_callback(struct request *const req, u32 ttl, u32 err, struct repl
 	if (reply) {
 		d->have_reply = 1;
 		memcpy(&d->reply, reply, sizeof(struct reply));
+	}
+
+	if (req->handle) {
+		req->handle->pending_cb = 1;
+		d->handle = req->handle;
 	}
 
 	event_deferred_cb_init(&d->deferred, reply_run_callback,
@@ -1148,7 +1170,7 @@ request_parse(u8 *packet, int length, struct evdns_server_port *port, struct soc
 			goto err;
 		GET16(type);
 		GET16(class);
-		namelen = strlen(tmp_name);
+		namelen = (int)strlen(tmp_name);
 		q = mm_malloc(sizeof(struct evdns_server_question) + namelen);
 		if (!q)
 			goto err;
@@ -1323,8 +1345,8 @@ server_port_flush(struct evdns_server_port *port)
 	struct server_request *req = port->pending_replies;
 	ASSERT_LOCKED(port);
 	while (req) {
-		int r = sendto(port->socket, req->response, req->response_len, 0,
-			   (struct sockaddr*) &req->addr, req->addrlen);
+		int r = sendto(port->socket, req->response, (int)req->response_len, 0,
+			   (struct sockaddr*) &req->addr, (ev_socklen_t)req->addrlen);
 		if (r < 0) {
 			int err = evutil_socket_geterror(port->socket);
 			if (EVUTIL_ERR_RW_RETRIABLE(err))
@@ -1485,7 +1507,7 @@ dnslabel_table_add(struct dnslabel_table *table, const char *label, off_t pos)
 /* */
 static off_t
 dnsname_to_labels(u8 *const buf, size_t buf_len, off_t j,
-				  const char *name, const int name_len,
+				  const char *name, const size_t name_len,
 				  struct dnslabel_table *table) {
 	const char *end = name + name_len;
 	int ref = 0;
@@ -1516,25 +1538,25 @@ dnsname_to_labels(u8 *const buf, size_t buf_len, off_t j,
 		}
 		name = strchr(name, '.');
 		if (!name) {
-			const unsigned int label_len = end - start;
+			const size_t label_len = end - start;
 			if (label_len > 63) return -1;
 			if ((size_t)(j+label_len+1) > buf_len) return -2;
 			if (table) dnslabel_table_add(table, start, j);
-			buf[j++] = label_len;
+			buf[j++] = (ev_uint8_t)label_len;
 
-			memcpy(buf + j, start, end - start);
-			j += end - start;
+			memcpy(buf + j, start, label_len);
+			j += (int) label_len;
 			break;
 		} else {
 			/* append length of the label. */
-			const unsigned int label_len = name - start;
+			const size_t label_len = name - start;
 			if (label_len > 63) return -1;
 			if ((size_t)(j+label_len+1) > buf_len) return -2;
 			if (table) dnslabel_table_add(table, start, j);
-			buf[j++] = label_len;
+			buf[j++] = (ev_uint8_t)label_len;
 
-			memcpy(buf + j, start, name - start);
-			j += name - start;
+			memcpy(buf + j, start, label_len);
+			j += (int) label_len;
 			/* hop over the '.' */
 			name++;
 		}
@@ -1564,7 +1586,7 @@ evdns_request_len(const size_t name_len) {
 /* */
 /* Returns the amount of space used. Negative on error. */
 static int
-evdns_request_data_build(const char *const name, const int name_len,
+evdns_request_data_build(const char *const name, const size_t name_len,
     const u16 trans_id, const u16 type, const u16 class,
     u8 *const buf, size_t buf_len) {
 	off_t j = 0;  /* current offset into buf */
@@ -1885,8 +1907,8 @@ evdns_server_request_respond(struct evdns_server_request *_req, int err)
 			goto done;
 	}
 
-	r = sendto(port->socket, req->response, req->response_len, 0,
-			   (struct sockaddr*) &req->addr, req->addrlen);
+	r = sendto(port->socket, req->response, (int)req->response_len, 0,
+			   (struct sockaddr*) &req->addr, (ev_socklen_t)req->addrlen);
 	if (r<0) {
 		int sock_err = evutil_socket_geterror(port->socket);
 		if (EVUTIL_ERR_RW_RETRIABLE(sock_err))
@@ -2053,7 +2075,7 @@ evdns_request_timeout_callback(evutil_socket_t fd, short events, void *arg) {
 	(void) fd;
 	(void) events;
 
-	log(EVDNS_LOG_DEBUG, "Request %lx timed out", (unsigned long) arg);
+	log(EVDNS_LOG_DEBUG, "Request %p timed out", arg);
 	EVDNS_LOCK(base);
 
 	req->ns->timedout++;
@@ -2138,11 +2160,11 @@ evdns_request_transmit(struct request *req) {
 	default:
 		/* all ok */
 		log(EVDNS_LOG_DEBUG,
-		    "Setting timeout for request %lx", (unsigned long) req);
+		    "Setting timeout for request %p", req);
 		if (evtimer_add(&req->timeout_event, &req->base->global_timeout) < 0) {
 			log(EVDNS_LOG_WARN,
-		      "Error from libevent when adding timer for request %lx",
-				(unsigned long) req);
+		      "Error from libevent when adding timer for request %p",
+			    req);
 			/* ???? Do more? */
 		}
 		req->tx_count++;
@@ -2637,8 +2659,10 @@ request_new(struct evdns_base *base, struct evdns_request *handle, int type,
 	req->ns = issuing_now ? nameserver_pick(base) : NULL;
 	req->next = req->prev = NULL;
 	req->handle = handle;
-	if (handle)
+	if (handle) {
 		handle->current_req = req;
+		handle->base = base;
+	}
 
 	return req;
 err1:
@@ -2667,14 +2691,24 @@ request_submit(struct request *const req) {
 void
 evdns_cancel_request(struct evdns_base *base, struct evdns_request *handle)
 {
-	struct request *req = handle->current_req;
+	struct request *req;
 
-	ASSERT_VALID_REQUEST(req);
-
-	if (!base)
-		base = req->base;
+	if (!base) {
+		/* This redundancy is silly; can we fix it? (Not for 2.0) XXXX */
+		base = handle->base;
+		if (!base && handle->current_req)
+			base = handle->current_req->base;
+	}
 
 	EVDNS_LOCK(base);
+	if (handle->pending_cb) {
+		EVDNS_UNLOCK(base);
+		return;
+	}
+
+	req = handle->current_req;
+	ASSERT_VALID_REQUEST(req);
+
 	reply_schedule_callback(req, 0, DNS_ERR_CANCEL, NULL);
 	if (req->ns) {
 		/* remove from inflight queue */
@@ -2907,7 +2941,7 @@ evdns_search_clear(void) {
 
 static void
 search_postfix_add(struct evdns_base *base, const char *domain) {
-	int domain_len;
+	size_t domain_len;
 	struct search_domain *sdomain;
 	while (domain[0] == '.') domain++;
 	domain_len = strlen(domain);
@@ -2921,7 +2955,7 @@ search_postfix_add(struct evdns_base *base, const char *domain) {
 	if (!sdomain) return;
 	memcpy( ((u8 *) sdomain) + sizeof(struct search_domain), domain, domain_len);
 	sdomain->next = base->global_search_state->head;
-	sdomain->len = domain_len;
+	sdomain->len = (int) domain_len;
 
 	base->global_search_state->head = sdomain;
 }
@@ -2984,7 +3018,7 @@ search_set_from_hostname(struct evdns_base *base) {
 /* warning: returns malloced string */
 static char *
 search_make_new(const struct search_state *const state, int n, const char *const base_name) {
-	const int base_len = strlen(base_name);
+	const size_t base_len = strlen(base_name);
 	const char need_to_append_dot = base_name[base_len - 1] == '.' ? 0 : 1;
 	struct search_domain *dom;
 
@@ -3394,7 +3428,7 @@ evdns_get_default_hosts_filename(void)
 	char path[MAX_PATH+1];
 	static const char hostfile[] = "\\drivers\\etc\\hosts";
 	char *path_out;
-	int len_out;
+	size_t len_out;
 
 	if (! SHGetSpecialFolderPathA(NULL, path, CSIDL_SYSTEM, 0))
 		return NULL;
@@ -4017,11 +4051,17 @@ struct evdns_getaddrinfo_request {
 	/* If we have one request answered and one request still inflight,
 	 * then this field holds the answer from the first request... */
 	struct evutil_addrinfo *pending_result;
-	/* And this field holds the error code from the first request... */
-	int pending_error;
 	/* And this event is a timeout that will tell us to cancel the second
 	 * request if it's taking a long time. */
 	struct event timeout;
+
+	/* And this field holds the error code from the first request... */
+	int pending_error;
+	/* If this is set, the user canceled this request. */
+	unsigned user_canceled : 1;
+	/* If this is set, the user can no longer cancel this request; we're
+	 * just waiting for the free. */
+	unsigned request_done : 1;
 };
 
 /* Convert an evdns errors to the equivalent getaddrinfo error. */
@@ -4051,6 +4091,8 @@ getaddrinfo_merge_err(int e1, int e2)
 static void
 free_getaddrinfo_request(struct evdns_getaddrinfo_request *data)
 {
+	/* DO NOT CALL this if either of the requests is pending.  Only once
+	 * both callbacks have been invoked is it safe to free the request */
 	if (data->pending_result)
 		evutil_freeaddrinfo(data->pending_result);
 	if (data->cname_result)
@@ -4083,7 +4125,6 @@ evdns_getaddrinfo_timeout_cb(evutil_socket_t fd, short what, void *ptr)
 	/* Cancel any pending requests, and note which one */
 	if (data->ipv4_request.r) {
 		evdns_cancel_request(NULL, data->ipv4_request.r);
-		data->ipv4_request.r = NULL;
 		v4_timedout = 1;
 		EVDNS_LOCK(data->evdns_base);
 		++data->evdns_base->getaddrinfo_ipv4_timeouts;
@@ -4091,7 +4132,6 @@ evdns_getaddrinfo_timeout_cb(evutil_socket_t fd, short what, void *ptr)
 	}
 	if (data->ipv6_request.r) {
 		evdns_cancel_request(NULL, data->ipv6_request.r);
-		data->ipv6_request.r = NULL;
 		v6_timedout = 1;
 		EVDNS_LOCK(data->evdns_base);
 		++data->evdns_base->getaddrinfo_ipv6_timeouts;
@@ -4114,7 +4154,10 @@ evdns_getaddrinfo_timeout_cb(evutil_socket_t fd, short what, void *ptr)
 		data->user_cb(e, NULL, data->user_data);
 	}
 
-	free_getaddrinfo_request(data);
+	if (!v4_timedout && !v6_timedout) {
+		/* should be impossible? XXXX */
+		free_getaddrinfo_request(data);
+	}
 }
 
 static int
@@ -4122,6 +4165,13 @@ evdns_getaddrinfo_set_timeout(struct evdns_base *evdns_base,
     struct evdns_getaddrinfo_request *data)
 {
 	return event_add(&data->timeout, &evdns_base->global_getaddrinfo_allow_skew);
+}
+
+static inline int
+evdns_result_is_answer(int result)
+{
+	return (result != DNS_ERR_NOTIMPL && result != DNS_ERR_REFUSED &&
+	    result != DNS_ERR_SERVERFAILED && result != DNS_ERR_CANCEL);
 }
 
 static void
@@ -4141,32 +4191,38 @@ evdns_getaddrinfo_gotresolve(int result, char type, int count,
 	int socklen, addrlen;
 	void *addrp;
 	int err;
-
-	if (result == DNS_ERR_CANCEL)
-		return;
+	int user_canceled;
 
 	EVUTIL_ASSERT(req->type == DNS_IPv4_A || req->type == DNS_IPv6_AAAA);
 	if (req->type == DNS_IPv4_A) {
 		data = EVUTIL_UPCAST(req, struct evdns_getaddrinfo_request, ipv4_request);
 		other_req = &data->ipv6_request;
-		if (result != DNS_ERR_NOTIMPL && result != DNS_ERR_REFUSED &&
-		    result != DNS_ERR_SERVERFAILED) {
-			EVDNS_LOCK(data->evdns_base);
-			++data->evdns_base->getaddrinfo_ipv4_answered;
-			EVDNS_UNLOCK(data->evdns_base);
-		}
 	} else {
 		data = EVUTIL_UPCAST(req, struct evdns_getaddrinfo_request, ipv6_request);
 		other_req = &data->ipv4_request;
-		if (result != DNS_ERR_NOTIMPL && result != DNS_ERR_REFUSED &&
-		    result != DNS_ERR_SERVERFAILED) {
-			EVDNS_LOCK(data->evdns_base);
-			++data->evdns_base->getaddrinfo_ipv6_answered;
-			EVDNS_UNLOCK(data->evdns_base);
-		}
 	}
 
+	EVDNS_LOCK(data->evdns_base);
+	if (evdns_result_is_answer(result)) {
+		if (req->type == DNS_IPv4_A)
+			++data->evdns_base->getaddrinfo_ipv4_answered;
+		else
+			++data->evdns_base->getaddrinfo_ipv6_answered;
+	}
+	user_canceled = data->user_canceled;
+	if (other_req->r == NULL)
+		data->request_done = 1;
+	EVDNS_UNLOCK(data->evdns_base);
+
 	req->r = NULL;
+
+	if (result == DNS_ERR_CANCEL && ! user_canceled) {
+		/* Internal cancel request from timeout or internal error.
+		 * we already answered the user. */
+		if (other_req->r == NULL)
+			free_getaddrinfo_request(data);
+		return;
+	}
 
 	if (result == DNS_ERR_NONE) {
 		if (count == 0)
@@ -4188,8 +4244,11 @@ evdns_getaddrinfo_gotresolve(int result, char type, int count,
 			return;
 		}
 
-		if (data->pending_result) {
-			/* If we have an answer waiting, ignore this error. */
+		if (user_canceled) {
+			data->user_cb(EVUTIL_EAI_CANCEL, NULL, data->user_data);
+		} else if (data->pending_result) {
+			/* If we have an answer waiting, and we weren't
+			 * canceled, ignore this error. */
 			add_cname_to_reply(data, data->pending_result);
 			data->user_cb(0, data->pending_result, data->user_data);
 			data->pending_result = NULL;
@@ -4199,6 +4258,16 @@ evdns_getaddrinfo_gotresolve(int result, char type, int count,
 				    data->pending_error);
 			data->user_cb(err, NULL, data->user_data);
 		}
+		free_getaddrinfo_request(data);
+		return;
+	} else if (user_canceled) {
+		if (other_req->r) {
+			/* The other request is still working; let it hit this
+			 * callback with EVUTIL_EAI_CANCEL callback and report
+			 * the failure. */
+			return;
+		}
+		data->user_cb(EVUTIL_EAI_CANCEL, NULL, data->user_data);
 		free_getaddrinfo_request(data);
 		return;
 	}
@@ -4235,12 +4304,12 @@ evdns_getaddrinfo_gotresolve(int result, char type, int count,
 		if (!ai) {
 			if (other_req->r) {
 				evdns_cancel_request(NULL, other_req->r);
-				other_req->r = NULL;
 			}
 			data->user_cb(EVUTIL_EAI_MEMORY, NULL, data->user_data);
 			evutil_freeaddrinfo(res);
 
-			free_getaddrinfo_request(data);
+			if (other_req->r == NULL)
+				free_getaddrinfo_request(data);
 			return;
 		}
 		res = evutil_addrinfo_append(res, ai);
@@ -4460,14 +4529,16 @@ evdns_getaddrinfo(struct evdns_base *dns_base,
 void
 evdns_getaddrinfo_cancel(struct evdns_getaddrinfo_request *data)
 {
+	EVDNS_LOCK(data->evdns_base);
+	if (data->request_done) {
+		EVDNS_UNLOCK(data->evdns_base);
+		return;
+	}
 	event_del(&data->timeout);
+	data->user_canceled = 1;
 	if (data->ipv4_request.r)
 		evdns_cancel_request(data->evdns_base, data->ipv4_request.r);
 	if (data->ipv6_request.r)
 		evdns_cancel_request(data->evdns_base, data->ipv6_request.r);
-	data->ipv4_request.r = data->ipv6_request.r = NULL;
-
-	data->user_cb(EVUTIL_EAI_CANCEL, NULL, data->user_data);
-
-	free_getaddrinfo_request(data);
+	EVDNS_UNLOCK(data->evdns_base);
 }
