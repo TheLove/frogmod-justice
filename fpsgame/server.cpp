@@ -2881,6 +2881,7 @@ namespace server
 
 	void kick_client(int victim, clientinfo *m) {
 		clientinfo *ci = (clientinfo *)getclientinfo(victim);
+		if(!ci) return;
 		if(m && m->privilege < PRIV_ADMIN) {
 			if(m->lastkickmillis && totalmillis - m->lastkickmillis <= kickmillis) {
 				m->nkicks++;
