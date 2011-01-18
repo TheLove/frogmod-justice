@@ -1076,6 +1076,7 @@ void quitsig(int s) {
 		irc.quit(ircquitmsg, ircquitsecs);
 	} else ircemptycb();
 }
+ICOMMAND(quit, "", (), quitsig(SIGQUIT));
 
 void initserver(bool listen, bool dedicated)
 {
