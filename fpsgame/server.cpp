@@ -3100,7 +3100,7 @@ namespace server
 	ICOMMAND(sendto, "i", (int *cn), {
 		if(cn) {
 			clientinfo *ci = (clientinfo *)getclientinfo(*cn);
-			sendmap(ci);
+			if(ci) sendmap(ci);
 		}
 	});
 
