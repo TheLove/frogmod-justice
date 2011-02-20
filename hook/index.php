@@ -22,7 +22,7 @@ if (isset($argv[1]) && $argv[1]) {
 <?
 try {
 $pdo = Database::getPDO();
-$lastPlayers = $pdo->query("SELECT * FROM disconnects, players WHERE players.id = disconnects.player_id ORDER BY disconnects.timestamp DESC LIMIT 20");
+$lastPlayers = $pdo->query("SELECT disconnects.connection_time, disconnects.timestamp, players.name, players.ip_address, servers.name AS server FROM disconnects, players, servers WHERE players.id = disconnects.player_id AND servers.id = disconnects.server_id ORDER BY disconnects.timestamp DESC LIMIT 20");
 if(isset($_GET['search'] )&& strlen($_GET['search']) > 2) {
 	$st = $pdo->prepare("SELECT * FROM players WHERE name LIKE :searchLike OR ip_address = :search LIMIT 100");
 	$st->execute(array('searchLike' => '%'.str_replace(array('%', '_'), array('\\%', '\\_'), trim($_GET['search'])).'%', 'search' => $_GET['search']));
@@ -57,10 +57,11 @@ if(isset($searchResults)) {
 </form>
 <h2>Disconnects</h2>
 <table border="1">
-<tr><th>Time</th><th>Name</th><th>IP</th><? if(function_exists('geoip_country_name_by_name')) { ?><th>Country</th><? } ?><th>Duration</th></tr>
+<tr><th>Time</th><th>Server</th><th>Name</th><th>IP</th><? if(function_exists('geoip_country_name_by_name')) { ?><th>Country</th><? } ?><th>Duration</th></tr>
 <? foreach($lastPlayers as $p) { ?>
 	<tr>
 		<td><?=date('d.m.Y H:i:s', strtotime($p['timestamp']))?></td>
+		<td><?=htmlspecialchars($p['server'])?></td>
 		<td><?=htmlspecialchars($p['name'])?></td>
 		<td><?=$p['ip_address']?></td>
 		<? if(function_exists('geoip_country_name_by_name')) { ?><td><?= @geoip_country_name_by_name($p['ip_address']); ?></td><? } ?>
