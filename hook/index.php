@@ -23,18 +23,52 @@ if (isset($argv[1]) && $argv[1]) {
 try {
 $pdo = Database::getPDO();
 $lastPlayers = $pdo->query("SELECT * FROM disconnects, players WHERE players.id = disconnects.player_id ORDER BY disconnects.timestamp DESC LIMIT 20");
+if(isset($_GET['search'] )&& strlen($_GET['search']) > 2) {
+	$st = $pdo->prepare("SELECT * FROM players WHERE name LIKE :searchLike OR ip_address = :search LIMIT 100");
+	$st->execute(array('searchLike' => '%'.str_replace(array('%', '_'), array('\\%', '\\_'), trim($_GET['search'])).'%', 'search' => $_GET['search']));
+	$searchResults = $st->fetchAll(PDO::FETCH_ASSOC);
+}
 } catch(PDOException $e) {
 	echo $e;
 }
 ?>
-<h2>Disconnects</h2>
+<a href="?">First page</a><br>
+<form action="" metho="GET">
+<input type="text" name="search" value="<?=isset($_GET['search'])?htmlspecialchars($_GET['search']):''?>">
+<input type="submit" value="Search by name or IP"></input>
+<?
+if(isset($searchResults)) {
+	if($searchResults) { ?>
+<h2>Search results for &quot;<?=htmlspecialchars($_GET['search'])?>&quot;</h2>
 <table border="1">
-<tr><th>Time</th><th>Name</th><th>IP</th><th>Duration</th></tr>
-<? foreach($lastPlayers as $p) { ?>
-	<tr><td><?=date('d.m.Y H:i:s', strtotime($p['timestamp']))?></td><td><?=htmlspecialchars($p['name'])?></td><td><?=$p['ip_address']?></td><td><? printf("%02d:%02d", floor($p['connection_time']/3600000), floor($p['connection_time']/60000)) ?></td></tr>
+<tr><th>Name</th><th>IP</th><? if(function_exists('geoip_country_name_by_name')) { ?><th>Country</th><? } ?></tr>
+<? foreach($searchResults as $r) { ?>
+<tr>
+	<td><?=htmlspecialchars($r['name'])?></td>
+	<td><?=$r['ip_address']?></td>
+	<? if(function_exists('geoip_country_name_by_name')) { ?>
+	<td><?= @geoip_country_name_by_name($r['ip_address']) ?></td>
+	<? } ?>
+</tr>
 <? } ?>
 </table>
-
+<? } else echo '<p>No results were found.</p>'; ?>
+<? } else { ?>
+</form>
+<h2>Disconnects</h2>
+<table border="1">
+<tr><th>Time</th><th>Name</th><th>IP</th><? if(function_exists('geoip_country_name_by_name')) { ?><th>Country</th><? } ?><th>Duration</th></tr>
+<? foreach($lastPlayers as $p) { ?>
+	<tr>
+		<td><?=date('d.m.Y H:i:s', strtotime($p['timestamp']))?></td>
+		<td><?=htmlspecialchars($p['name'])?></td>
+		<td><?=$p['ip_address']?></td>
+		<? if(function_exists('geoip_country_name_by_name')) { ?><td><?= @geoip_country_name_by_name($p['ip_address']); ?></td><? } ?>
+		<td><? printf("%02d:%02d", floor($p['connection_time']/3600000), floor($p['connection_time']/60000)) ?></td>
+	</tr>
+<? } ?>
+</table>
+<? } ?>
 <?
 }
 
