@@ -2199,8 +2199,10 @@ namespace server
 			}
 
 			target->state.deaths++;
-			if(actor!=target && isteam(actor->team, target->team)) actor->state.teamkills++;
-			outf(2 | OUT_NOGAME, "%s fragged a teammate", actor->name);
+			if(actor!=target && isteam(actor->team, target->team)) {
+				actor->state.teamkills++;
+				outf(2 | OUT_NOGAME, "%s fragged a teammate (%s)", colorname(actor), colorname(target));
+			}
 			int fragvalue = smode ? smode->fragvalue(target, actor) : (target==actor || isteam(target->team, actor->team) ? -1 : 1);
 			actor->state.frags += fragvalue;
 			if(fragvalue>0)
