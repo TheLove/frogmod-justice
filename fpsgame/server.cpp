@@ -3163,6 +3163,10 @@ namespace server
 #endif
 				outf(2 | OUT_NOGAME, "\f0%s\f7 connected (%s/%s)\n", ci->name, getclientipstr(ci->clientnum), getclienthostname(ci->clientnum));
 
+				if(checkblacklist(ci)) {
+					outf(2, "\f3WARNING: Player \"\f2%s\f3\" is blacklisted!", ci->name);
+				}
+
 				http_post_event_connect(ci);
 			}
 		}
