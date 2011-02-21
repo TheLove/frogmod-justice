@@ -131,6 +131,7 @@ void voutf(int v, const char *fmt, va_list args)
 		puts(sp);
 		free(sp);
 		if(httpoutbuf) evbuffer_add_printf(httpoutbuf, "%s\n", s);
+		server::httplog(s);
 	}
 	if(irc.base && !(v & OUT_NOIRC)) {
 		char *sp = color_sauer2irc(s);
@@ -146,8 +147,6 @@ void voutf(int v, const char *fmt, va_list args)
 		f->printf("%08lu %s\n", tv.tv_sec, s);
 		f->close();
 	}
-
-	server::httplog(s);
 
 	free(s);
 }
