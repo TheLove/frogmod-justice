@@ -1006,7 +1006,8 @@ namespace server
 		loopv(bannedips) if(!fnmatch(bannedips[i].pattern, getclienthostname(ci->clientnum), 0)) { disconnect_client(ci->clientnum, DISC_IPBAN); return; }
 		char *reason = (char *)"";
 		if(checkblacklist(ci, &reason)) {
-			outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
+			if(ci->name && ci->name[0])
+				outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
 		}
 	}
 
@@ -3096,6 +3097,7 @@ namespace server
 						delete[] execthis;
 					}
 					evbuffer_free(buf);
+					break;
 				}
 			}
 		} else execute(txt);
