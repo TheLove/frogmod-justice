@@ -2854,6 +2854,13 @@ namespace server
 		clientinfo *ci = (clientinfo *)getclientinfo(*cn);
 		result(ci ? ci->team : "");
 	});
+	ICOMMAND(getclientnum, "s", (char *name), {
+		if(name) {
+			loopv(clients) if(clients[i]) {
+				if(!strcasecmp(name, clients[i]->name)) intret(clients[i]->clientnum);
+			}
+		} else if(scriptclient) intret(scriptclient->clientnum);
+	});
 	ICOMMAND(getclientip, "i", (int *cn), result(getclientipstr(*cn)));
 	ICOMMAND(getclienthostname, "i", (int *cn), result(getclienthostname(*cn)));
 #ifdef HAVE_GEOIP
