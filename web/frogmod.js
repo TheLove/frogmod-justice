@@ -277,6 +277,7 @@ function update_players_cb(xhr) {
 								html.push('<a href="?command=takemaster" title="Take master" onclick="return execute(&quot;takemaster&quot;);"><img src="takemaster.png" alt="[T]"></a> ');
 							else
 								html.push('<a href="?command=givemaster+'+players[p].clientnum+'" onclick="return execute(&quot;givemaster '+players[p].clientnum+'&quot;);" title="Give master"><img src="givemaster.png" alt="[M]"></a> ');
+							html.push('<a href="?command=blacklist+(getclientip+'+players[p].clientnum+')" onclick="return execute(&quot;blacklist (getclientip '+players[p].clientnum+') \\&quot;&quot;+prompt(&quot;reason&quot;)+&quot\\&quot;)&quot;)" title="Blacklist"><img src="kick.png" alt="[B]"></a> ');
 							html.push('</td>');
 						}
 						html.push('</tr>');
