@@ -72,8 +72,12 @@ th {
 	background: black;
 	color: white;
 	padding: 2px;
-	max-height: 200px;
 	overflow-y: scroll;
+	font-family: monospace;
+	white-space: pre-wrap;
+	font-size: 10px;
+	width: 560px;
+	height: 350px;
 }
 
 .privilege0 {
