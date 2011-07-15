@@ -997,14 +997,19 @@ namespace server
 		evbuffer_free(evb);
 	}
 
+	const char *colorname(clientinfo *ci, char *name = NULL, bool forcecn = false);
+	bool checkblacklist(clientinfo *ci, char **reason = NULL);
 	void gothostname(void *info) {
 		clientinfo *ci = (clientinfo *)info;
 		loopv(bannedips) if(!fnmatch(bannedips[i].pattern, getclienthostname(ci->clientnum), 0)) { disconnect_client(ci->clientnum, DISC_IPBAN); return; }
+		char *reason = (char *)"";
+		if(checkblacklist(ci, &reason)) {
+			outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
+		}
 	}
 
 	clientinfo *scriptclient;
 	IRC::Source *scriptircsource = NULL;
-	const char *colorname(clientinfo *ci, char *name = NULL, bool forcecn = false);
 	ICOMMAND(login, "s", (char *s), {
 		if(s && *s && *adminpass && !strcmp(s, adminpass)) {
 			if(scriptircsource) {
@@ -1538,11 +1543,12 @@ namespace server
 		if(ci->state.state==CS_SPECTATOR && !ci->local) aiman::removeai(ci);
 	}
 
-	bool checkblacklist(clientinfo *ci) {
+	bool checkblacklist(clientinfo *ci, char **reason) {
 		loopv(blacklistips) {
 			if(!fnmatch(blacklistips[i].pattern, ci->name, 0) ||
 			   !fnmatch(blacklistips[i].pattern, getclienthostname(ci->clientnum), 0) ||
 			   !fnmatch(blacklistips[i].pattern, getclientipstr(ci->clientnum), 0)) {
+			   if(reason) *reason = blacklistips[i].reason;
 				return true;
 			}
 		}
@@ -1573,8 +1579,9 @@ namespace server
 				sendf(ci->clientnum, 1, "ris", N_SERVMSG, "This server requires you to use the \"/auth\" command to gain master.");
 				return;
 			} else {
-				if(checkblacklist(ci)) {
-					outf(2, "\f2Blacklisted setmaster failed: %s", colorname(ci));
+				char *reason = (char *)"";
+				if(checkblacklist(ci, &reason)) {
+					outf(2, "\f3Blacklisted setmaster failed: \f6%s\f3, reason: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
 					return;
 				}
 				if(authname) {
@@ -2889,11 +2896,11 @@ namespace server
 			if(m->lastkickmillis && totalmillis - m->lastkickmillis <= kickmillis) {
 				m->nkicks++;
 				if(m->nkicks >= maxkicks) {
-					defformatstring(foo)("Mass kicking (automatically added for kicking %s(%s)).", colorname(ci), getclientipstr(victim));
+					defformatstring(foo)("Mass kicking (%s(%s) automatically added for kicking %s(%s)).", colorname(m), getclientipstr(m->clientnum), colorname(ci), getclientipstr(victim));
 					addblacklist((char *)getclientipstr(m->clientnum), (char *)foo);
 					clearbans();
 					kick_client(m->clientnum, NULL);
-				} else outf(2, "\f3Kick protection triggered (%s/%s). Kick denied for %s/%s.", colorname(ci), getclientipstr(victim), colorname(m), getclientipstr(m->clientnum));
+				} else outf(2, "\f3Kick protection triggered: %s/%s tried to kick %s/%s.", colorname(m), getclientipstr(m->clientnum), colorname(ci), getclientipstr(victim));
 				m->lastkickmillis = totalmillis;
 				return;
 			} else m->nkicks = 0;
@@ -3165,8 +3172,9 @@ namespace server
 #endif
 				outf(2 | OUT_NOGAME, "\f0%s\f7 connected (%s/%s)\n", ci->name, getclientipstr(ci->clientnum), getclienthostname(ci->clientnum));
 
-				if(checkblacklist(ci)) {
-					outf(2, "\f3WARNING: Player \"\f2%s\f3\" is blacklisted!", ci->name);
+				char *reason = (char *)"";
+				if(checkblacklist(ci, &reason)) {
+					outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
 				}
 
 				http_post_event_connect(ci);
