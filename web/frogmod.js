@@ -222,7 +222,7 @@ function update_players_cb(xhr) {
 					var html = new Array();
 					html.push('<table><tr>');
 					var arr = sort_reverse ? '&uarr;' : '&darr;';
-					var fields = [ 'cn', 'name', 'ip', 'country', 'team', 'status', 'ping', 'frags', 'deaths', 'teamkills', 'shotdamage', 'damage', 'effectiveness', 'uptime' ];
+					var fields = [ 'cn', 'name', 'ip', 'country', 'team', 'status', 'ping', 'fr', 'dt', 'tk', 'sd', 'dm', 'ef', 'up' ];
 					for(f in fields) {
 						if(fields[f] != 'ip' || admin)
 							html.push('<th><a href="#" onclick="if(sort_by == &quot;'+fields[f]+'&quot;) sort_reverse = !sort_reverse; else sort_reverse = false; sort_by = &quot;'+fields[f]+'&quot;; update_players(); return false;"'+(sort_by == fields[f] ? ' class="currentsort"' : '')+'>'+fields[f]+'</a> '+(sort_by == fields[f]?arr:'')+'</th>');
@@ -234,17 +234,17 @@ function update_players_cb(xhr) {
 							case 'cn':
 								return parseInt(a.clientnum) - parseInt(b.clientnum);
 							case 'ping':
-							case 'frags':
-							case 'deaths':
-							case 'teamkills':
-							case 'shotdamage':
-							case 'damage':
+							case 'fr':
+							case 'dt':
+							case 'tk':
+							case 'sd':
+							case 'dm':
 								return parseInt(a[sort_by]) - parseFloat(b[sort_by]);
-							case 'effectiveness':
+							case 'ef':
 								return parseFloat(a.shotdamage) - parseFloat(b.shotdamage);
-							case 'status':
+							case 'st':
 								return states[a.state].localeCompare(states[b.state]);
-							case 'uptime':
+							case 'up':
 								return a.connectmillis - b.connectmillis;
 							default:
 								return a[sort_by].toLowerCase().localeCompare(b[sort_by].toLowerCase());
