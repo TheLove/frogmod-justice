@@ -440,6 +440,7 @@ namespace server
 		}
 	});
 	SVAR(servermotd, "");
+	SVAR(mastermessage, "");
 
 	void *newclientinfo() { return new clientinfo; }
 	void deleteclientinfo(void *ci) { delete (clientinfo *)ci; }
@@ -665,6 +666,7 @@ namespace server
 		evbuffer_add_printf(buf, "{\n");
 		evbuffer_add_json_prop(buf, "serverdesc", serverdesc);
 		evbuffer_add_json_prop(buf, "servermotd", servermotd);
+		evbuffer_add_json_prop(buf, "mastermessage", mastermessage);
 		evbuffer_add_json_prop(buf, "maxclients", maxclients, false);
 		evbuffer_add_printf(buf, "}");
 		evhttp_send_reply(req, 200, "OK", buf);
@@ -1604,6 +1606,7 @@ namespace server
 		else formatstring(msg)("%s %s %s", colorname(ci), val ? "claimed" : "relinquished", name);
 		outf(2, "%s. Mastermode is \f1%s\f7.", msg, mastermodename(mastermode));
 		currentmaster = val ? ci->clientnum : -1;
+		if(val) sendf(currentmaster, 1, "ris", N_SERVMSG, mastermessage);
 		updateirctopic();
 		sendf(-1, 1, "ri4", N_CURRENTMASTER, currentmaster, currentmaster >= 0 ? ci->privilege : 0, mastermode);
 		if(gamepaused)
@@ -2860,6 +2863,23 @@ namespace server
 				if(!strcasecmp(name, clients[i]->name)) intret(clients[i]->clientnum);
 			}
 		} else if(scriptclient) intret(scriptclient->clientnum);
+	});
+	ICOMMAND(getclientstate, "is", (int *cn, char *name), {
+		clientinfo *ci = NULL;
+		if(cn) ci = (clientinfo *)getclientinfo(*cn);
+		if(ci) {
+			if(!name || !name[0] || !strcmp(name, "state")) {
+				intret(ci->state.state);
+			} else if(!strcmp(name, "frags")) {
+				intret(ci->state.frags);
+			} else if(!strcmp(name, "deaths")) {
+				intret(ci->state.deaths);
+			} else if(!strcmp(name, "teamkills")) {
+				intret(ci->state.teamkills);
+			} else if(!strcmp(name, "damage")) {
+				intret(ci->state.damage);
+			}
+		}
 	});
 	ICOMMAND(getclientip, "i", (int *cn), result(getclientipstr(*cn)));
 	ICOMMAND(getclienthostname, "i", (int *cn), result(getclienthostname(*cn)));
