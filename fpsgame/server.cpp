@@ -244,6 +244,7 @@ namespace server
 		int lastclipboard, needclipboard;
 		// mass kick protection:
 		int lastkickmillis, nkicks; // last kick timestamp, number of kicks attempts since then
+		bool warned_blacklisted; // avoid double "player is blacklisted" warnings...
 
 		clientinfo() : clipboard(NULL) { reset(); }
 		~clientinfo() { events.deletecontents(); cleanclipboard(); }
@@ -342,6 +343,7 @@ namespace server
 			logged_in = false;
 			cleanclipboard();
 			mapchange();
+			warned_blacklisted = false;
 		}
 
 		int geteventmillis(int servmillis, int clientmillis)
@@ -1006,8 +1008,10 @@ namespace server
 		loopv(bannedips) if(!fnmatch(bannedips[i].pattern, getclienthostname(ci->clientnum), 0)) { disconnect_client(ci->clientnum, DISC_IPBAN); return; }
 		char *reason = (char *)"";
 		if(checkblacklist(ci, &reason)) {
-			if(ci->name && ci->name[0])
+			if(ci->name && ci->name[0]) {
 				outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
+				ci->warned_blacklisted = true;
+			}
 		}
 	}
 
@@ -3204,6 +3208,7 @@ namespace server
 				char *reason = (char *)"";
 				if(checkblacklist(ci, &reason)) {
 					outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
+					ci->warned_blacklisted = true;
 				}
 
 				http_post_event_connect(ci);
