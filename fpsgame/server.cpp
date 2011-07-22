@@ -1007,7 +1007,7 @@ namespace server
 		clientinfo *ci = (clientinfo *)info;
 		loopv(bannedips) if(!fnmatch(bannedips[i].pattern, getclienthostname(ci->clientnum), 0)) { disconnect_client(ci->clientnum, DISC_IPBAN); return; }
 		char *reason = (char *)"";
-		if(checkblacklist(ci, &reason)) {
+		if(checkblacklist(ci, &reason) && !ci->warned_blacklisted) {
 			if(ci->name && ci->name[0]) {
 				outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
 				ci->warned_blacklisted = true;
@@ -3206,7 +3206,7 @@ namespace server
 				outf(2 | OUT_NOGAME, "\f0%s\f7 connected (%s/%s)\n", ci->name, getclientipstr(ci->clientnum), getclienthostname(ci->clientnum));
 
 				char *reason = (char *)"";
-				if(checkblacklist(ci, &reason)) {
+				if(checkblacklist(ci, &reason) && !ci->warned_blacklisted) {
 					outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
 					ci->warned_blacklisted = true;
 				}
