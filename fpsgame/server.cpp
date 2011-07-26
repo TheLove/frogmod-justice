@@ -2889,7 +2889,7 @@ namespace server
 	ICOMMAND(getclientip, "i", (int *cn), result(getclientipstr(*cn)));
 	ICOMMAND(getclienthostname, "i", (int *cn), result(getclienthostname(*cn)));
 #ifdef HAVE_GEOIP
-	ICOMMAND(getclientcountry, "i", (int *cn), result(getclientcountry(*cn)));
+	ICOMMAND(getclientcountry, "i", (int *cn), { const char *c = getclientcountry(*cn); result(c?c:""); });
 #else
 	ICOMMAND(getclientcountry, "i", (int *cn), result(""));
 #endif
@@ -3197,7 +3197,7 @@ namespace server
 				if(servermotd[0]) sendf(sender, 1, "ris", N_SERVMSG, servermotd);
 
 #ifdef HAVE_GEOIP
-				const char *country = getclientcountry(ci->clientnum);
+				const char *country = getclientcountrynul(ci->clientnum);
 				if(country) {
 					outf(2 | OUT_NOGAME, "\f0%s\f7 connected from \f2%s\f7 (%s/%s)", ci->name, country, getclientipstr(ci->clientnum), getclienthostname(ci->clientnum));
 					outf(2 | OUT_NOIRC | OUT_NOCONSOLE, "\f0%s\f7 is connected from \f2%s\f7", ci->name, country);
@@ -3207,7 +3207,10 @@ namespace server
 
 				char *reason = (char *)"";
 				if(checkblacklist(ci, &reason) && !ci->warned_blacklisted) {
-					outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\"", colorname(ci, NULL, true), reason);
+					if(reason && reason[0])
+						outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted: \"\f7%s\f3\".", colorname(ci, NULL, true), reason);
+					else
+						outf(2, "\f3WARNING: Player \"\f6%s\f3\" is blacklisted.", colorname(ci, NULL, true));
 					ci->warned_blacklisted = true;
 				}
 
