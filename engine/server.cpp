@@ -1086,9 +1086,13 @@ void initserver(bool listen, bool dedicated)
 	initconsole();
 	ircinit();
 
+	persistidents = false;
+
     if(dedicated) execfile("server-init.cfg", false);
 
     execfile("stdlib.cfg");
+
+	persistidents = true;
 
     execfile(game::savedconfig());
 
