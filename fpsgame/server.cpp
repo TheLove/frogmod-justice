@@ -720,7 +720,7 @@ namespace server
 	}
 
 	void spectator(int, int);
-	void setmaster(clientinfo *ci, bool val, const char *pass = "", const char *authname = NULL);
+	void setmaster(clientinfo *ci, bool val, const char *pass = "", const char *authname = NULL, bool no_open = false);
 	void kick_client(int cn, clientinfo *m = NULL);
 	static void httpadmincb(struct evhttp_request *req, void *arg) {
 		if(checkhttpauth(req)) {
@@ -1578,7 +1578,7 @@ namespace server
 	}
 
 	void updateirctopic();
-	void setmaster(clientinfo *ci, bool val, const char *pass, const char *authname)
+	void setmaster(clientinfo *ci, bool val, const char *pass, const char *authname, bool no_open)
 	{
 		if(authname && !val) return;
 		const char *name = "";
@@ -1618,7 +1618,7 @@ namespace server
 			name = privname(ci->privilege);
 			revokemaster(ci);
 		}
-		if(!haspass || !val) mastermode = MM_OPEN;
+		if(!no_open && (!haspass || !val)) mastermode = MM_OPEN;
 
 		allowedips.shrink(0);
 		string msg;
@@ -2926,7 +2926,7 @@ namespace server
 			if(ci) {
 				clientinfo *cm = (clientinfo *)getclientinfo(currentmaster);
 				if(cm) setmaster(cm, 0);
-				setmaster(ci, 1);
+				setmaster(ci, 1, "", NULL, true);
 			}
 		}
 	});
