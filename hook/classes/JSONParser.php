@@ -40,6 +40,19 @@ class JSONParser {
                 echo "type[{$event->type}], $server, $player\n";
 
             /**
+             * Name change event
+             */
+        } else if ($event->type == "nameswitch" && $server && $player) {
+            $connectEvent = new NameChangeEvent();
+            $connectEvent->setPlayer($player);
+            $connectEvent->setServer($server);
+            $connectEvent->setNewName($event->newName);
+            $connectEvent->insert();
+
+            if (Config::$debug)
+                echo "type[{$event->type}], $server, $player\n";
+
+            /**
              * Disconnect event
              */
         } else if ($event->type == "disconnect" && $server && $player && isset($event->connectionTime)) {

@@ -847,7 +847,9 @@ namespace server
 		HOOKFLAG_NOKILL = 4,
 		HOOKFLAG_NOKICK = 8,
 		HOOKFLAG_NOSUICIDE = 16,
-		HOOKFLAG_NOINTERMISSION = 32
+		HOOKFLAG_NOINTERMISSION = 32,
+		HOOKFLAG_NONAMECHANGE = 64,
+		HOOKFLAG_NOBLACKLIST = 128,
 	};
 	VAR(httphook_flags, 0, HOOKFLAG_NOKILL, 65535);
 
@@ -898,6 +900,19 @@ namespace server
 		evbuffer_add_json_server(buf);
 		evbuffer_add_json_prop(buf, "type", "connect");
 		evbuffer_add_json_player_simple(buf, "player", ci, false);
+		evbuffer_add_printf(buf, "}");
+		http_post_evbuffer(buf);
+		evbuffer_free(buf);
+	}
+
+	void http_post_event_namechange(clientinfo *ci, char *newName) {
+		if(http_hook_has_flag(HOOKFLAG_NONAMECHANGE)) return;
+		evbuffer *buf = evbuffer_new();
+		evbuffer_add_printf(buf, "{");
+		evbuffer_add_json_server(buf);
+		evbuffer_add_json_prop(buf, "type", "connect");
+		evbuffer_add_json_player_simple(buf, "player", ci);
+		evbuffer_add_json_prop(buf, "newName", newName);
 		evbuffer_add_printf(buf, "}");
 		http_post_evbuffer(buf);
 		evbuffer_free(buf);
@@ -2928,11 +2943,11 @@ namespace server
 			if(m->lastkickmillis && totalmillis - m->lastkickmillis <= kickmillis) {
 				m->nkicks++;
 				if(m->nkicks >= maxkicks) {
-					defformatstring(foo)("Mass kicking (%s(%s) automatically added for kicking %s(%s)).", colorname(m), getclientipstr(m->clientnum), colorname(ci), getclientipstr(victim));
+					defformatstring(foo)("Mass kicking (%s(%s) automatically added).", colorname(m), getclientipstr(m->clientnum), colorname(ci), getclientipstr(victim));
 					addblacklist((char *)getclientipstr(m->clientnum), (char *)foo);
 					clearbans();
 					kick_client(m->clientnum, NULL);
-				} else outf(2, "\f3Kick protection triggered: %s/%s tried to kick %s/%s.", colorname(m), getclientipstr(m->clientnum), colorname(ci), getclientipstr(victim));
+				} else outf(2, "\f3Kick protection triggered: %s/%s tried to kick %s.", colorname(m), getclientipstr(m->clientnum), colorname(ci));
 				m->lastkickmillis = totalmillis;
 				return;
 			} else m->nkicks = 0;
@@ -3508,7 +3523,7 @@ namespace server
 				filtertext(newname, text, false, MAXNAMELEN);
 				if(!newname[0]) copystring(ci->name, "unnamed");
 				outf(2 | OUT_NOGAME, "%s is now known as %s\n", ci->name, newname);
-				http_post_event("action", "switchname", "name", ci->name, "ip", getclienthostname(ci->clientnum), "newname", newname, NULL);
+				http_post_event_namechange(ci, newname);
 				copystring(ci->name, newname);
 				QUEUE_STR(ci->name);
 				break;
