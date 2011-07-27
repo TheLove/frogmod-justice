@@ -547,6 +547,7 @@ namespace server
 		if(*filename) contents = loadfile(path, &len);
 		if(contents) {
 			evhttp_request_add_content_type(req, filename);
+			evhttp_add_header(evhttp_request_get_output_headers(req), "Cache-Control", "max-age=36000"); // 10hrs
 			evbuffer *buf = evbuffer_new();
 			evbuffer_add(buf, contents, len);
 			evhttp_send_reply(req, 200, "OK", buf);
